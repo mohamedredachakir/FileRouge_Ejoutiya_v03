@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Store\UpsertMyStoreRequest;
 use App\Models\Store;
 use Illuminate\Http\Request;
 
@@ -52,14 +53,9 @@ class StoreController extends Controller
         ]);
     }
 
-    public function upsertMyStore(Request $request)
+    public function upsertMyStore(UpsertMyStoreRequest $request)
     {
-        $validated = $request->validate([
-            'store_name' => ['required', 'string', 'max:255'],
-            'bio' => ['nullable', 'string'],
-            'logo' => ['nullable', 'string', 'max:255'],
-            'hero_image' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         $store = $request->user()->storeProfile()->updateOrCreate(
             ['user_id' => $request->user()->id],
