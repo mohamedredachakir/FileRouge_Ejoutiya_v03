@@ -21,11 +21,11 @@ Route::get('/stores/{id}', [StoreController::class, 'show']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
-Route::middleware(['auth:sanctum', 'role:client,store,admin'])->group(function () {
+Route::middleware(['auth:sanctum', 'not.banned', 'role:client,store_owner,admin'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
 
-Route::middleware(['auth:sanctum','role:client'])->group(function (){
+Route::middleware(['auth:sanctum', 'not.banned', 'role:client'])->group(function () {
     Route::get('/me', [ProfileController::class, 'me']);
     Route::put('/me', [ProfileController::class, 'update']);
     Route::get('/cart', [\App\Http\Controllers\Api\CartController::class, 'show']);
@@ -38,17 +38,21 @@ Route::middleware(['auth:sanctum','role:client'])->group(function (){
     Route::get('/orders/me/{orderId}', [OrderController::class, 'showMyOrder']);
 });
 
-Route::middleware(['auth:sanctum', 'role:store'])->group(function () {
+Route::middleware(['auth:sanctum', 'not.banned', 'role:store_owner'])->group(function () {
     Route::get('/store/me', [StoreController::class, 'myStore']);
     Route::put('/store/me', [StoreController::class, 'upsertMyStore']);
-    Route::post('/store/products', [ProductController::class, 'store']);
-    Route::put('/store/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/store/products/{id}', [ProductController::class, 'destroy']);
+
+    Route::middleware('store.approved')->group(function () {
+        Route::post('/store/products', [ProductController::class, 'store']);
+        Route::put('/store/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/store/products/{id}', [ProductController::class, 'destroy']);
+    });
+
     Route::get('/store/orders', [OrderController::class, 'storeOrders']);
     Route::patch('/store/orders/{orderId}/status', [OrderController::class, 'updateStoreOrderStatus']);
 });
 
-Route::middleware(['auth:sanctum', 'role:admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth:sanctum', 'not.banned', 'role:admin'])->prefix('admin')->group(function () {
     Route::get('/ping', function () {
         return response()->json(['message' => 'Admin access granted']);
     });
