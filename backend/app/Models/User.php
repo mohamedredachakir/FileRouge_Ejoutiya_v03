@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Cart;
 use App\Models\Store;
 use App\Models\Order;
-#[Fillable(['name', 'email', 'password','role','is_banned'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'city', 'zip_code', 'address', 'role', 'is_banned'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -37,5 +38,10 @@ class User extends Authenticatable
 
     public function orders(){
         return $this->hasMany(Order::class,'client_id');
+    }
+
+    public function cart()
+    {
+        return $this->hasOne(Cart::class, 'client_id');
     }
 }
