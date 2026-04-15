@@ -1,0 +1,138 @@
+@startuml EjoutiyaEcom_Final
+
+skinparam classAttributeIconSize 0
+hide circle
+
+' =======================
+' ENUMS
+' =======================
+enum Category {
+  T_SHIRT
+  HOODIE
+  PANTS
+  SNEAKERS
+  ACCESSORIES
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  DELIVERY
+  REJECTED
+}
+
+enum ProductStatus {
+  ACTIVE
+  OUT_OF_STOCK
+  HIDDEN
+}
+
+enum StoreStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_APPROVAL
+}
+
+' =======================
+' USER SYSTEM
+' =======================
+class User {
+  -id: int
+  -name: string
+  -email: string
+  -password: string
+  
+  -phone: string
+  -city: string
+  -zipCode: string
+  -address: string
+  
+  -isBanned: boolean
+}
+
+class Client
+class StoreOwner
+class Admin {
+  +banUser(userId: int)
+  +unbanUser(userId: int)
+}
+
+User <|-- Client
+User <|-- StoreOwner
+User <|-- Admin
+
+Admin --> User : ban / unban
+
+' =======================
+' STORE
+' =======================
+class Store {
+  -id: int
+  -storeName: string
+  -bio: string
+  -logo: string
+  -heroImage: string
+  -status: StoreStatus
+}
+
+StoreOwner "1" --> "1" Store : owns
+Store --> StoreOwner : belongsTo
+Admin --> Store : approve / suspend
+
+' =======================
+' PRODUCT
+' =======================
+class Product {
+  -id: int
+  -name: string
+  -description: string
+  -price: float
+  -stock: int
+  -category: Category
+  -status: ProductStatus
+}
+
+class ProductImg {
+  -id: int
+  -imagePath: string
+}
+
+Store "1" --> "0..*" Product
+Product "1" --> "0..*" ProductImg : images
+
+' =======================
+' ORDER
+' =======================
+class Order {
+  -id: int
+  -status: OrderStatus
+  -totalPrice: float
+  -createdAt: datetime
+}
+
+class OrderItem {
+  -quantity: int
+  -price: float
+}
+
+Client "1" --> "0..*" Order
+Order "1" --> "1..*" OrderItem
+OrderItem "*" --> "1" Product
+
+' =======================
+' CART
+' =======================
+class Cart {
+  -id: int
+  -createdAt: datetime
+}
+
+class CartItem {
+  -quantity: int
+}
+
+Client "1" --> "1" Cart
+Cart "1" --> "0..*" CartItem
+CartItem "*" --> "1" Product
+
+@enduml

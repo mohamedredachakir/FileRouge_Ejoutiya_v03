@@ -1,0 +1,61 @@
+@startuml EjoutiyaEcom_UseCase
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor Client
+actor StoreOwner
+actor Admin
+
+rectangle "system" {
+' =======================
+' CLIENT USE CASES
+' =======================
+rectangle "Client Features" {
+  Client --> (Browse Products)
+  Client --> (View Product Details)
+  
+  Client --> (Add to Cart)
+  Client --> (Update Cart)
+  Client --> (Remove from Cart)
+  Client --> (View Cart)
+
+  Client --> (Place Order)
+  Client --> (View Orders)
+}
+
+' =======================
+' STORE OWNER USE CASES
+' =======================
+rectangle "Store Owner Features" {
+  StoreOwner --> (Manage Store)
+  StoreOwner --> (Create Store)
+
+  StoreOwner --> (Add Product)
+  StoreOwner --> (Update Product)
+  StoreOwner --> (Delete Product)
+
+  StoreOwner --> (Manage Stock)
+  StoreOwner --> (View Orders)
+}
+
+' =======================
+' ADMIN USE CASES
+' =======================
+rectangle "Admin Features" {
+  Admin --> (Ban User)
+  Admin --> (Unban User)
+
+  Admin --> (Approve Store)
+  Admin --> (Suspend Store)
+}
+
+' =======================
+' RELATIONS (INCLUDE)
+' =======================
+(Place Order) .> (View Cart) : <<include>>
+(Place Order) .> (Calculate Total Price) : <<include>>
+
+}
+
+@enduml
