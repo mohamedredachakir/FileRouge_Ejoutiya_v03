@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Product\StoreProductRequest;
+use App\Http\Requests\Product\UpdateProductRequest;
 use App\Models\Product;
 use Illuminate\Http\Request;
 
@@ -43,18 +45,9 @@ class ProductController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreProductRequest $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['required', 'string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'stock' => ['required', 'integer', 'min:0'],
-            'category' => ['required', 'string'],
-            'status' => ['required', 'string'],
-            'images' => ['nullable', 'array'],
-            'images.*' => ['string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         $store = $request->user()->storeProfile;
 
@@ -84,7 +77,7 @@ class ProductController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, int $id)
+    public function update(UpdateProductRequest $request, int $id)
     {
         $product = Product::find($id);
 
@@ -98,16 +91,7 @@ class ProductController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'description' => ['sometimes', 'string'],
-            'price' => ['sometimes', 'numeric', 'min:0'],
-            'stock' => ['sometimes', 'integer', 'min:0'],
-            'category' => ['sometimes', 'string'],
-            'status' => ['sometimes', 'string'],
-            'images' => ['sometimes', 'array'],
-            'images.*' => ['string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         $product->update(collect($validated)->except('images')->toArray());
 
