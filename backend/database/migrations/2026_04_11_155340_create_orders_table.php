@@ -16,9 +16,9 @@ return new class extends Migration
             $table->foreignId('client_id')->constrained('users')->cascadeOnDelete();
             $table->enum('status',['pending','confirmed','delivery','rejected'])->default('pending');
             $table->decimal('total_price',10,2);
-            $table->string('phone');
-            $table->string('city');
-            $table->string('zip_code');
+            $table->string('phone', 30);
+            $table->string('city', 255);
+            $table->string('zip_code', 30);
             $table->text('address');
             $table->timestamps();
         });
