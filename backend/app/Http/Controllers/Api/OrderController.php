@@ -3,40 +3,41 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Order\CheckoutRequest;
+use App\Http\Requests\Order\UpdateOrderStatusRequest;
+use App\Models\Cart;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 
 class OrderController extends Controller
 {
-    public function checkout(Request $request)
+    public function checkout(CheckoutRequest $request)
     {
-        $validated = $request->validate([
-            'phone' => ['required', 'string', 'max:30'],
-            'city' => ['required', 'string', 'max:255'],
-            'zip_code' => ['required', 'string', 'max:30'],
-            'address' => ['required', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
         $userId = (int) $request->user()->id;
-        $cartItems = $this->getCartItems($userId);
+        $cart = Cart::with('items.product')->firstOrCreate([
+            'client_id' => $userId,
+        ]);
 
-        if (empty($cartItems)) {
+        $cartItems = $cart->items;
+
+        if ($cartItems->isEmpty()) {
             return response()->json(['message' => 'Cart is empty'], 422);
         }
 
         $preparedItems = [];
 
         foreach ($cartItems as $item) {
-            $product = Product::find((int) ($item['product_id'] ?? 0));
+            $product = $item->product;
 
             if (! $product) {
                 return response()->json(['message' => 'Product not found in cart'], 422);
             }
 
-            $quantity = (int) ($item['quantity'] ?? 0);
+            $quantity = (int) $item->quantity;
 
             if ($quantity <= 0) {
                 return response()->json(['message' => 'Invalid quantity in cart'], 422);
@@ -90,7 +91,7 @@ class OrderController extends Controller
             return $order;
         });
 
-        Redis::del($this->cartKey($userId));
+        $cart->items()->delete();
 
         return response()->json([
             'message' => 'Order created successfully',
@@ -158,11 +159,9 @@ class OrderController extends Controller
         ]);
     }
 
-    public function updateStoreOrderStatus(Request $request, int $orderId)
+    public function updateStoreOrderStatus(UpdateOrderStatusRequest $request, int $orderId)
     {
-        $validated = $request->validate([
-            'status' => ['required', 'in:confirmed,rejected'],
-        ]);
+        $validated = $request->validated();
 
         $store = $request->user()->storeProfile;
 
@@ -188,23 +187,5 @@ class OrderController extends Controller
             'message' => 'Order status updated',
             'data' => $order->fresh('items.product'),
         ]);
-    }
-
-    private function cartKey(int $userId): string
-    {
-        return 'cart:' . $userId;
-    }
-
-    private function getCartItems(int $userId): array
-    {
-        $raw = Redis::get($this->cartKey($userId));
-
-        if (! $raw) {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-
-        return is_array($decoded) ? $decoded : [];
     }
 }
