@@ -3,125 +3,104 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Cart\AddCartItemRequest;
+use App\Http\Requests\Cart\UpdateCartItemRequest;
+use App\Models\Cart;
+use App\Models\CartItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Redis;
 
 class CartController extends Controller
 {
-    private const TTL_SECONDS = 86400;
-
     public function show(Request $request)
     {
+        $cart = $this->getOrCreateCart($request);
+
         return response()->json([
             'message' => 'Cart data',
-            'data' => $this->getCartItems($request->user()->id),
+            'data' => $cart->load('items.product'),
         ]);
     }
 
-    public function addItem(Request $request)
+    public function addItem(AddCartItemRequest $request)
     {
-        $validated = $request->validate([
-            'product_id' => ['required', 'integer', 'exists:products,id'],
-            'quantity' => ['required', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $product = Product::findOrFail($validated['product_id']);
-        $items = $this->getCartItems($request->user()->id);
-        $existingIndex = $this->findItemIndex($items, $product->id);
+        $cart = $this->getOrCreateCart($request);
 
-        if ($existingIndex !== null) {
-            $items[$existingIndex]['quantity'] += $validated['quantity'];
+        $item = CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $product->id)
+            ->first();
+
+        if ($item) {
+            $item->increment('quantity', $validated['quantity']);
         } else {
-            $items[] = [
+            $cart->items()->create([
                 'product_id' => $product->id,
-                'name' => $product->name,
                 'quantity' => $validated['quantity'],
-                'price' => (float) $product->price,
-            ];
+            ]);
         }
 
-        $this->saveCartItems($request->user()->id, $items);
+        $cart->load('items.product');
 
         return response()->json([
             'message' => 'Item added to cart',
-            'data' => $items,
+            'data' => $cart,
         ], 201);
     }
 
-    public function updateItem(Request $request, int $productId)
+    public function updateItem(UpdateCartItemRequest $request, int $productId)
     {
-        $validated = $request->validate([
-            'quantity' => ['required', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
-        $items = $this->getCartItems($request->user()->id);
-        $index = $this->findItemIndex($items, $productId);
+        $cart = $this->getOrCreateCart($request);
 
-        if ($index === null) {
+        $item = CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $productId)
+            ->first();
+
+        if (! $item) {
             return response()->json(['message' => 'Cart item not found'], 404);
         }
 
-        $items[$index]['quantity'] = $validated['quantity'];
-        $this->saveCartItems($request->user()->id, $items);
+        $item->update(['quantity' => $validated['quantity']]);
+        $cart->load('items.product');
 
         return response()->json([
             'message' => 'Cart item updated',
-            'data' => $items,
+            'data' => $cart,
         ]);
     }
 
     public function removeItem(Request $request, int $productId)
     {
-        $items = $this->getCartItems($request->user()->id);
-        $items = array_values(array_filter($items, fn ($item) => (int) $item['product_id'] !== $productId));
+        $cart = $this->getOrCreateCart($request);
 
-        $this->saveCartItems($request->user()->id, $items);
+        CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $productId)
+            ->delete();
+
+        $cart->load('items.product');
 
         return response()->json([
             'message' => 'Cart item removed',
-            'data' => $items,
+            'data' => $cart,
         ]);
     }
 
     public function clear(Request $request)
     {
-        Redis::del($this->cartKey($request->user()->id));
+        $cart = $this->getOrCreateCart($request);
+        $cart->items()->delete();
 
         return response()->json(['message' => 'Cart cleared']);
     }
 
-    private function cartKey(int $userId): string
+    private function getOrCreateCart(Request $request): Cart
     {
-        return 'cart:' . $userId;
-    }
-
-    private function getCartItems(int $userId): array
-    {
-        $raw = Redis::get($this->cartKey($userId));
-
-        if (! $raw) {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-
-        return is_array($decoded) ? $decoded : [];
-    }
-
-    private function saveCartItems(int $userId, array $items): void
-    {
-        Redis::setex($this->cartKey($userId), self::TTL_SECONDS, json_encode(array_values($items)));
-    }
-
-    private function findItemIndex(array $items, int $productId): ?int
-    {
-        foreach ($items as $index => $item) {
-            if ((int) ($item['product_id'] ?? 0) === $productId) {
-                return $index;
-            }
-        }
-
-        return null;
+        return Cart::firstOrCreate([
+            'client_id' => $request->user()->id,
+        ]);
     }
 }
