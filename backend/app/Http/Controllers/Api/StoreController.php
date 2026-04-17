@@ -12,6 +12,7 @@ class StoreController extends Controller
     public function index()
     {
         $stores = Store::with('user')
+            ->where('status', 'active')
             ->latest()
             ->get();
 
@@ -23,7 +24,13 @@ class StoreController extends Controller
 
     public function show(int $id)
     {
-        $store = Store::with(['user', 'products.images'])
+        $store = Store::where('status', 'active')
+            ->with([
+                'user',
+                'products' => function ($query) {
+                    $query->where('status', 'active')->with('images');
+                },
+            ])
             ->find($id);
 
         if (! $store) {
@@ -55,6 +62,10 @@ class StoreController extends Controller
 
     public function upsertMyStore(UpsertMyStoreRequest $request)
     {
+        if ($request->user()?->role !== 'store_owner') {
+            return response()->json(['message' => 'Only store owners can manage a store.'], 403);
+        }
+
         $validated = $request->validated();
 
         $store = $request->user()->storeProfile()->updateOrCreate(
