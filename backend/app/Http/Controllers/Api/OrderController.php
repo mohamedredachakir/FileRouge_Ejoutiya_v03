@@ -18,7 +18,7 @@ class OrderController extends Controller
         $validated = $request->validated();
 
         $userId = (int) $request->user()->id;
-        $cart = Cart::with('items.product')->firstOrCreate([
+        $cart = Cart::with('items.product.store')->firstOrCreate([
             'client_id' => $userId,
         ]);
 
@@ -29,12 +29,35 @@ class OrderController extends Controller
         }
 
         $preparedItems = [];
+        $checkoutStoreId = null;
 
         foreach ($cartItems as $item) {
             $product = $item->product;
 
             if (! $product) {
                 return response()->json(['message' => 'Product not found in cart'], 422);
+            }
+
+            $store = $product->store;
+
+            if (! $store || $store->status !== 'active') {
+                return response()->json([
+                    'message' => 'Product store is not active: ' . $product->name,
+                ], 422);
+            }
+
+            if ($product->status !== 'active') {
+                return response()->json([
+                    'message' => 'Product is not available for checkout: ' . $product->name,
+                ], 422);
+            }
+
+            if ($checkoutStoreId === null) {
+                $checkoutStoreId = (int) $store->id;
+            } elseif ($checkoutStoreId !== (int) $store->id) {
+                return response()->json([
+                    'message' => 'Checkout with products from multiple stores is not supported yet.',
+                ], 422);
             }
 
             $quantity = (int) $item->quantity;
@@ -50,46 +73,80 @@ class OrderController extends Controller
             }
 
             $preparedItems[] = [
-                'product' => $product,
+                'product_id' => (int) $product->id,
                 'quantity' => $quantity,
-                // Snapshot from current DB price for safer checkout.
-                'price' => (float) $product->price,
             ];
         }
 
-        $order = DB::transaction(function () use ($request, $validated, $preparedItems) {
-            $total = 0;
+        usort($preparedItems, fn (array $a, array $b) => $a['product_id'] <=> $b['product_id']);
 
-            $order = Order::create([
-                'client_id' => $request->user()->id,
-                'status' => 'pending',
-                'total_price' => 0,
-                'phone' => $validated['phone'],
-                'city' => $validated['city'],
-                'zip_code' => $validated['zip_code'],
-                'address' => $validated['address'],
-            ]);
+        try {
+            $order = DB::transaction(function () use ($request, $validated, $preparedItems) {
+                $total = 0;
 
-            foreach ($preparedItems as $prepared) {
-                /** @var Product $product */
-                $product = $prepared['product'];
-                $quantity = $prepared['quantity'];
-                $priceSnapshot = $prepared['price'];
-
-                $order->items()->create([
-                    'product_id' => $product->id,
-                    'quantity' => $quantity,
-                    'price' => $priceSnapshot,
+                $order = Order::create([
+                    'client_id' => $request->user()->id,
+                    'status' => 'pending',
+                    'total_price' => 0,
+                    'phone' => $validated['phone'],
+                    'city' => $validated['city'],
+                    'zip_code' => $validated['zip_code'],
+                    'address' => $validated['address'],
                 ]);
 
-                $product->decrement('stock', $quantity);
-                $total += $priceSnapshot * $quantity;
-            }
+                $lockedCheckoutStoreId = null;
 
-            $order->update(['total_price' => $total]);
+                foreach ($preparedItems as $prepared) {
+                    /** @var Product|null $product */
+                    $product = Product::with('store')
+                        ->lockForUpdate()
+                        ->find($prepared['product_id']);
 
-            return $order;
-        });
+                    if (! $product) {
+                        throw new \RuntimeException('A product in your cart no longer exists.');
+                    }
+
+                    if ($product->status !== 'active') {
+                        throw new \RuntimeException('Product is no longer available: ' . $product->name);
+                    }
+
+                    $store = $product->store;
+
+                    if (! $store || $store->status !== 'active') {
+                        throw new \RuntimeException('Store is no longer active for product: ' . $product->name);
+                    }
+
+                    if ($lockedCheckoutStoreId === null) {
+                        $lockedCheckoutStoreId = (int) $store->id;
+                    } elseif ($lockedCheckoutStoreId !== (int) $store->id) {
+                        throw new \RuntimeException('Checkout with products from multiple stores is not supported yet.');
+                    }
+
+                    $quantity = (int) $prepared['quantity'];
+
+                    if ((int) $product->stock < $quantity) {
+                        throw new \RuntimeException('Not enough stock for product: ' . $product->name);
+                    }
+
+                    $priceSnapshot = (float) $product->price;
+
+                    $order->items()->create([
+                        'product_id' => $product->id,
+                        'quantity' => $quantity,
+                        'price' => $priceSnapshot,
+                    ]);
+
+                    $product->decrement('stock', $quantity);
+                    $total += $priceSnapshot * $quantity;
+                }
+
+                $order->update(['total_price' => $total]);
+
+                return $order;
+            });
+        } catch (\RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         $cart->items()->delete();
 
@@ -169,11 +226,27 @@ class OrderController extends Controller
             return response()->json(['message' => 'Store profile not found'], 404);
         }
 
-        $order = Order::whereHas('items.product', function ($query) use ($store) {
+        $order = Order::with('items.product')->whereHas('items.product', function ($query) use ($store) {
             $query->where('store_id', $store->id);
         })->find($orderId);
 
         if (! $order) {
+            return response()->json(['message' => 'Order not found for your store'], 404);
+        }
+
+        $storeIdsInOrder = $order->items
+            ->pluck('product.store_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($storeIdsInOrder->count() > 1) {
+            return response()->json([
+                'message' => 'Cannot update status for mixed-store orders.',
+            ], 422);
+        }
+
+        if ($storeIdsInOrder->isEmpty() || (int) $storeIdsInOrder->first() !== (int) $store->id) {
             return response()->json(['message' => 'Order not found for your store'], 404);
         }
 
