@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Models\Product;
+use App\Models\StoreOwner;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -18,7 +20,14 @@ use Illuminate\Support\Str;
 ])]
 class Store extends Model
 {
+    use HasFactory;
+
     protected $appends = ['logo_url', 'hero_image_url'];
+
+    public function storeOwner()
+    {
+        return $this->belongsTo(StoreOwner::class, 'user_id');
+    }
 
     public function user()
     {
