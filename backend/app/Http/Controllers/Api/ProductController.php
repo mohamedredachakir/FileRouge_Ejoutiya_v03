@@ -13,14 +13,14 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $query = Product::with(['store', 'images'])
+            ->where('status', 'active')
+            ->whereHas('store', function ($storeQuery) {
+                $storeQuery->where('status', 'active');
+            })
             ->latest();
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->integer('store_id'));
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->string('status'));
         }
 
         $products = $query->get();
@@ -33,7 +33,12 @@ class ProductController extends Controller
 
     public function show(int $id)
     {
-        $product = Product::with(['store', 'images'])->find($id);
+        $product = Product::with(['store', 'images'])
+            ->where('status', 'active')
+            ->whereHas('store', function ($storeQuery) {
+                $storeQuery->where('status', 'active');
+            })
+            ->find($id);
 
         if (! $product) {
             return response()->json(['message' => 'Product not found'], 404);
