@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterStoreRequest;
-use App\Models\User;
+use App\Models\StoreOwner;
 use Illuminate\Support\Facades\Hash;
 
 class AuthStoreController extends Controller
@@ -13,11 +13,10 @@ class AuthStoreController extends Controller
     {
         $validated = $request->validated();
 
-        $user = User::create([
+        $user = StoreOwner::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => 'store_owner',
         ]);
 
         $user->storeProfile()->create([
