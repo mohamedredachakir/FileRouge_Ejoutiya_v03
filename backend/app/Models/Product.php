@@ -6,6 +6,7 @@ use App\Models\OrderItem;
 use App\Models\ProductImage;
 use App\Models\Store;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 #[Fillable([
@@ -19,6 +20,8 @@ use Illuminate\Database\Eloquent\Model;
 ])]
 class Product extends Model
 {
+    use HasFactory;
+
     protected $appends = ['main_image_url'];
 
     public function store()
