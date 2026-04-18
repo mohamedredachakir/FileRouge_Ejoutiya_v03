@@ -9,11 +9,17 @@ class UserManagementController extends Controller
 {
     public function index()
     {
-        $users = User::latest()->get();
+        $users = User::latest()->paginate(15);
 
         return response()->json([
             'message' => 'Users list',
-            'data' => $users,
+            'data' => $users->items(),
+            'meta' => [
+                'current_page' => $users->currentPage(),
+                'last_page' => $users->lastPage(),
+                'per_page' => $users->perPage(),
+                'total' => $users->total(),
+            ],
         ]);
     }
 
