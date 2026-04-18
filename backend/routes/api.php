@@ -43,6 +43,7 @@ Route::middleware(['auth:sanctum', 'not.banned', 'role:store_owner'])->group(fun
     Route::put('/store/me', [StoreController::class, 'upsertMyStore']);
 
     Route::middleware('store.approved')->group(function () {
+        Route::get('/store/products', [ProductController::class, 'myStoreProducts']);
         Route::post('/store/products', [ProductController::class, 'store']);
         Route::put('/store/products/{id}', [ProductController::class, 'update']);
         Route::delete('/store/products/{id}', [ProductController::class, 'destroy']);
