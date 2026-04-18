@@ -23,11 +23,17 @@ class ProductController extends Controller
             $query->where('store_id', $request->integer('store_id'));
         }
 
-        $products = $query->get();
+        $products = $query->paginate(12);
 
         return response()->json([
             'message' => 'Products list',
-            'data' => $products,
+            'data' => $products->items(),
+            'meta' => [
+                'current_page' => $products->currentPage(),
+                'last_page' => $products->lastPage(),
+                'per_page' => $products->perPage(),
+                'total' => $products->total(),
+            ],
         ]);
     }
 
@@ -134,5 +140,21 @@ class ProductController extends Controller
         $product->delete();
 
         return response()->json(['message' => 'Product deleted']);
+    }
+
+    public function myStoreProducts(Request $request)
+    {
+        $store = $request->user()->storeProfile;
+
+        if (! $store) {
+            return response()->json(['message' => 'Store profile not found'], 404);
+        }
+
+        $products = $store->products()->with('images')->latest()->get();
+
+        return response()->json([
+            'message' => 'Store products list',
+            'data' => $products,
+        ]);
     }
 }
