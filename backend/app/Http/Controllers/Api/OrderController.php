@@ -161,11 +161,17 @@ class OrderController extends Controller
         $orders = Order::with(['items.product'])
             ->where('client_id', $request->user()->id)
             ->latest()
-            ->get();
+            ->paginate(10);
 
         return response()->json([
             'message' => 'My orders',
-            'data' => $orders,
+            'data' => $orders->items(),
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+            ],
         ]);
     }
 
@@ -208,11 +214,17 @@ class OrderController extends Controller
                 $query->where('status', request('status'));
             })
             ->latest()
-            ->get();
+            ->paginate(10);
 
         return response()->json([
             'message' => 'Store orders',
-            'data' => $orders,
+            'data' => $orders->items(),
+            'meta' => [
+                'current_page' => $orders->currentPage(),
+                'last_page' => $orders->lastPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+            ],
         ]);
     }
 
