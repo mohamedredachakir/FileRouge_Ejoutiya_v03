@@ -9,17 +9,4 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  server: {
-    host: '0.0.0.0',
-    port: 5174,
-    watch: {
-      usePolling: true,
-    },
-    proxy: {
-      '/api': {
-        target: 'http://nginx:80',
-        changeOrigin: true,
-      },
-    },
-  },
 })
