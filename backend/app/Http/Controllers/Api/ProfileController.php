@@ -12,7 +12,7 @@ class ProfileController extends Controller
     {
         return response()->json([
             'message' => 'Profile fetched',
-            'user' => $request->user(),
+            'data' => $request->user(),
         ]);
     }
 
@@ -26,7 +26,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => 'Profile updated',
-            'user' => $user->fresh(),
+            'data' => $user->fresh(),
         ]);
     }
 }
