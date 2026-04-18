@@ -9,11 +9,17 @@ class StoreManagementController extends Controller
 {
     public function index()
     {
-        $stores = Store::with('user')->latest()->get();
+        $stores = Store::with('user')->latest()->paginate(15);
 
         return response()->json([
             'message' => 'Stores list',
-            'data' => $stores,
+            'data' => $stores->items(),
+            'meta' => [
+                'current_page' => $stores->currentPage(),
+                'last_page' => $stores->lastPage(),
+                'per_page' => $stores->perPage(),
+                'total' => $stores->total(),
+            ],
         ]);
     }
 
