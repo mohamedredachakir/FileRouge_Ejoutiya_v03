@@ -14,11 +14,17 @@ class StoreController extends Controller
         $stores = Store::with('user')
             ->where('status', 'active')
             ->latest()
-            ->get();
+            ->paginate(12);
 
         return response()->json([
             'message' => 'Stores list',
-            'data' => $stores,
+            'data' => $stores->items(),
+            'meta' => [
+                'current_page' => $stores->currentPage(),
+                'last_page' => $stores->lastPage(),
+                'per_page' => $stores->perPage(),
+                'total' => $stores->total(),
+            ],
         ]);
     }
 
