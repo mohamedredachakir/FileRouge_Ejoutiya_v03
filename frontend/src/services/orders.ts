@@ -1,7 +1,19 @@
 import api from './api'
 import type { Order, ApiResponse, PaginatedResponse } from '../types'
 
-export interface CheckoutPayload { phone: string; city: string; postal_code?: string; address: string }
+export interface CheckoutItemPayload {
+  product_id: number
+  quantity: number
+  size: string
+}
+
+export interface CheckoutPayload {
+  phone: string
+  city: string
+  zip_code: string
+  address: string
+  items: CheckoutItemPayload[]
+}
 
 export const ordersService = {
   async checkout(payload: CheckoutPayload) {
