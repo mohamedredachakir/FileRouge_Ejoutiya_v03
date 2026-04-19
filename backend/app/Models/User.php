@@ -12,12 +12,27 @@ use Laravel\Sanctum\HasApiTokens;
 use App\Models\Cart;
 use App\Models\Store;
 use App\Models\Order;
-#[Fillable(['name', 'email', 'password', 'phone', 'city', 'zip_code', 'address', 'role', 'is_banned'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'phone',
+        'city',
+        'zip_code',
+        'address',
+        'role',
+        'is_banned'
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     /**
      * Get the attributes that should be cast.
