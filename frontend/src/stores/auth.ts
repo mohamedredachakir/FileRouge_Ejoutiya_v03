@@ -49,7 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function registerStore(payload: RegisterStorePayload) {
+  async function registerStore(payload: RegisterStorePayload | FormData) {
     loading.value = true
     try {
       const res = await authService.registerStore(payload)
