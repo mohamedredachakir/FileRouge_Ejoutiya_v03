@@ -3,7 +3,7 @@ import { ref } from 'vue'
 
 export type ToastType = 'default' | 'error' | 'warn'
 export interface Toast { id: number; message: string; type: ToastType }
-export type ModalType = 'login' | 'register' | 'register-store' | null
+export type ModalType = 'login' | 'register' | 'register-store' | 'search' | null
 
 let toastId = 0
 
