@@ -17,6 +17,10 @@ class RegisterClientRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'phone' => ['required', 'string', 'max:20'],
+            'city' => ['required', 'string', 'max:255'],
+            'zip_code' => ['required', 'string', 'max:20'],
+            'address' => ['required', 'string'],
         ];
     }
 }
