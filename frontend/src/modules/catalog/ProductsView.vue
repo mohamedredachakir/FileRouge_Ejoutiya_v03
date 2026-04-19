@@ -17,6 +17,14 @@ const ui = useUiStore()
 
 const activeFilter = ref((route.query.category as string) || 'ALL')
 const activeSort = ref('default')
+const currentPage = ref(parseInt(route.query.page as string) || 1)
+const searchQuery = ref((route.query.search as string) || '')
+
+watch(() => route.query.search, (newVal) => {
+  searchQuery.value = (newVal as string) || ''
+  currentPage.value = 1
+  load()
+})
 
 const filters = [
   { key: 'ALL', label: 'ALL' },
@@ -34,33 +42,82 @@ const sortOptions = [
   { value: 'name', label: 'A → Z' },
 ]
 
+let searchTimeout: any = null
 async function load() {
   const params: any = {}
   if (activeFilter.value !== 'ALL') params.category = activeFilter.value
   if (activeSort.value !== 'default') params.sort = activeSort.value
+  if (searchQuery.value) params.search = searchQuery.value
+  params.page = currentPage.value
   await catalog.fetchProducts(params)
 }
 
+function handleSearch() {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    currentPage.value = 1
+    router.replace({
+      query: {
+        ...route.query,
+        search: searchQuery.value || undefined,
+        page: 1
+      }
+    })
+    load()
+  }, 500)
+}
+
 onMounted(load)
-watch([activeFilter, activeSort], load)
+watch([activeFilter, activeSort, currentPage], load)
 
 function setFilter(key: string) {
   activeFilter.value = key
-  router.replace({ query: key !== 'ALL' ? { category: key } : {} })
+  currentPage.value = 1
+  router.replace({ 
+    query: { 
+      ...(key !== 'ALL' ? { category: key } : {}),
+      search: searchQuery.value || undefined,
+      page: 1 
+    } 
+  })
 }
 
-function quickAdd(p: Product, size: string, e: Event) {
+function clearSearch() {
+  searchQuery.value = ''
+  currentPage.value = 1
+  router.replace({
+    query: {
+      ...route.query,
+      search: undefined,
+      page: 1
+    }
+  })
+  load()
+}
+
+function goToPage(page: number) {
+  currentPage.value = page
+  router.push({
+    query: {
+      ...route.query,
+      page
+    }
+  })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+async function quickAdd(p: Product, size: string, e: Event) {
   e.stopPropagation()
-  cart.addItem({
+  ui.showToast('ADDED TO CART.')
+  await cart.addItem({
     product_id: p.id,
     product_name: p.name,
     product_price: p.price,
     product_category: p.category,
     main_image_url: p.main_image_url,
-    store_name: p.store?.name || '—',
+    store_name: p.store?.store_name || '—',
     size,
   })
-  ui.showToast('ADDED TO CART.')
 }
 
 function getBadge(p: Product) {
@@ -86,15 +143,24 @@ function getBadge(p: Product) {
       </div>
     </div>
 
-    <!-- Filter bar -->
+    <!-- Search & Filter bar -->
     <div class="filter-bar">
-      <button
-        v-for="f in filters"
-        :key="f.key"
-        class="fb"
-        :class="{ on: activeFilter === f.key }"
-        @click="setFilter(f.key)"
-      >{{ f.label }}</button>
+      <div v-if="searchQuery" class="search-indicator">
+        <span class="si-label">RESULTS FOR:</span>
+        <span class="si-val">{{ searchQuery }}</span>
+        <button class="si-clear" @click="clearSearch">×</button>
+      </div>
+      
+      <div class="fb-group">
+        <button
+          v-for="f in filters"
+          :key="f.key"
+          class="fb"
+          :class="{ on: activeFilter === f.key }"
+          @click="setFilter(f.key)"
+        >{{ f.label }}</button>
+      </div>
+
       <div style="margin-left:auto">
         <select
           v-model="activeSort"
@@ -137,6 +203,7 @@ function getBadge(p: Product) {
                 :key="sz"
                 class="sz-btn"
                 :class="{ oos: p.stock === 0 }"
+                :disabled="p.stock === 0"
                 @click.stop="quickAdd(p, sz, $event)"
               >{{ sz }}</button>
             </div>
@@ -144,7 +211,7 @@ function getBadge(p: Product) {
           <div class="pc-info">
             <div>
               <div class="pc-name">{{ p.name }}</div>
-              <div class="pc-sub">{{ p.store?.name || '—' }}</div>
+              <div class="pc-sub">{{ p.store?.store_name || '—' }}</div>
             </div>
             <div class="pc-price">
               <span v-if="p.original_price" class="pc-price-old">{{ p.original_price }} MAD</span>
@@ -160,6 +227,38 @@ function getBadge(p: Product) {
           <div class="empty-msg">Try a different category or check back later.</div>
         </div>
       </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="catalog.lastPage > 1" class="pagination-wrap">
+      <div class="pagination">
+        <button 
+          class="pg-btn" 
+          :disabled="catalog.currentPage === 1" 
+          @click="goToPage(catalog.currentPage - 1)"
+        >
+          <span class="pg-arrow">←</span> PREV
+        </button>
+        
+        <div class="pg-pages">
+          <button 
+            v-for="p in catalog.lastPage" 
+            :key="p" 
+            class="pg-num" 
+            :class="{ active: p === catalog.currentPage }"
+            @click="goToPage(p)"
+          >{{ p }}</button>
+        </div>
+
+        <button 
+          class="pg-btn" 
+          :disabled="catalog.currentPage === catalog.lastPage" 
+          @click="goToPage(catalog.currentPage + 1)"
+        >
+          NEXT <span class="pg-arrow">→</span>
+        </button>
+      </div>
+      <div class="pg-info">PAGE {{ catalog.currentPage }} OF {{ catalog.lastPage }}</div>
     </div>
 
     <AppFooter />
