@@ -13,6 +13,35 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    private function formatStoreOrder(Order $order): array
+    {
+        $items = $order->items->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'product' => $item->product,
+                'size' => $item->size,
+                'quantity' => $item->quantity,
+                'price' => (float) $item->price,
+                'unit_price' => (float) $item->price,
+            ];
+        })->values();
+
+        return [
+            'id' => $order->id,
+            'reference' => 'ORD-' . str_pad((string) $order->id, 6, '0', STR_PAD_LEFT),
+            'status' => $order->status,
+            'total' => (float) $order->total_price,
+            'total_price' => (float) $order->total_price,
+            'phone' => $order->phone,
+            'city' => $order->city,
+            'zip_code' => $order->zip_code,
+            'address' => $order->address,
+            'items' => $items,
+            'client' => $order->client,
+            'created_at' => $order->created_at,
+        ];
+    }
+
     public function checkout(CheckoutRequest $request)
     {
         $validated = $request->validated();
@@ -22,66 +51,31 @@ class OrderController extends Controller
             'client_id' => $userId,
         ]);
 
-        $cartItems = $cart->items;
+        $cartItems = collect($validated['items'] ?? [])
+            ->map(function (array $item) {
+                return [
+                    'product_id' => (int) $item['product_id'],
+                    'quantity' => (int) $item['quantity'],
+                    'size' => (string) $item['size'],
+                ];
+            });
+
+        if ($cartItems->isEmpty()) {
+            $cartItems = $cart->items->map(function ($item) {
+                return [
+                    'product_id' => (int) $item->product_id,
+                    'quantity' => (int) $item->quantity,
+                    'size' => (string) $item->size,
+                ];
+            });
+        }
 
         if ($cartItems->isEmpty()) {
             return response()->json(['message' => 'Cart is empty'], 422);
         }
 
-        $preparedItems = [];
-        $checkoutStoreId = null;
-
-        foreach ($cartItems as $item) {
-            $product = $item->product;
-
-            if (! $product) {
-                return response()->json(['message' => 'Product not found in cart'], 422);
-            }
-
-            $store = $product->store;
-
-            if (! $store || $store->status !== 'active') {
-                return response()->json([
-                    'message' => 'Product store is not active: ' . $product->name,
-                ], 422);
-            }
-
-            if ($product->status !== 'active') {
-                return response()->json([
-                    'message' => 'Product is not available for checkout: ' . $product->name,
-                ], 422);
-            }
-
-            if ($checkoutStoreId === null) {
-                $checkoutStoreId = (int) $store->id;
-            } elseif ($checkoutStoreId !== (int) $store->id) {
-                return response()->json([
-                    'message' => 'Checkout with products from multiple stores is not supported yet.',
-                ], 422);
-            }
-
-            $quantity = (int) $item->quantity;
-
-            if ($quantity <= 0) {
-                return response()->json(['message' => 'Invalid quantity in cart'], 422);
-            }
-
-            if ((int) $product->stock < $quantity) {
-                return response()->json([
-                    'message' => 'Not enough stock for product: ' . $product->name,
-                ], 422);
-            }
-
-            $preparedItems[] = [
-                'product_id' => (int) $product->id,
-                'quantity' => $quantity,
-            ];
-        }
-
-        usort($preparedItems, fn (array $a, array $b) => $a['product_id'] <=> $b['product_id']);
-
         try {
-            $order = DB::transaction(function () use ($request, $validated, $preparedItems) {
+            $order = DB::transaction(function () use ($request, $validated, $cartItems) {
                 $total = 0;
 
                 $order = Order::create([
@@ -94,57 +88,43 @@ class OrderController extends Controller
                     'address' => $validated['address'],
                 ]);
 
-                $lockedCheckoutStoreId = null;
+                foreach ($cartItems as $item) {
+                    $product = Product::lockForUpdate()->find($item['product_id']);
 
-                foreach ($preparedItems as $prepared) {
-                    /** @var Product|null $product */
-                    $product = Product::with('store')
-                        ->lockForUpdate()
-                        ->find($prepared['product_id']);
-
-                    if (! $product) {
-                        throw new \RuntimeException('A product in your cart no longer exists.');
+                    if (!$product) {
+                        throw new \RuntimeException('Product not found: ' . $item['product_id']);
                     }
 
-                    if ($product->status !== 'active') {
-                        throw new \RuntimeException('Product is no longer available: ' . $product->name);
-                    }
-
-                    $store = $product->store;
-
-                    if (! $store || $store->status !== 'active') {
-                        throw new \RuntimeException('Store is no longer active for product: ' . $product->name);
-                    }
-
-                    if ($lockedCheckoutStoreId === null) {
-                        $lockedCheckoutStoreId = (int) $store->id;
-                    } elseif ($lockedCheckoutStoreId !== (int) $store->id) {
-                        throw new \RuntimeException('Checkout with products from multiple stores is not supported yet.');
-                    }
-
-                    $quantity = (int) $prepared['quantity'];
-
-                    if ((int) $product->stock < $quantity) {
-                        throw new \RuntimeException('Not enough stock for product: ' . $product->name);
+                    if ($product->stock < $item['quantity']) {
+                        throw new \RuntimeException('Not enough stock for: ' . $product->name);
                     }
 
                     $priceSnapshot = (float) $product->price;
 
                     $order->items()->create([
                         'product_id' => $product->id,
-                        'quantity' => $quantity,
+                        'quantity' => $item['quantity'],
                         'price' => $priceSnapshot,
+                        'size' => $item['size'],
                     ]);
 
-                    $product->decrement('stock', $quantity);
-                    $total += $priceSnapshot * $quantity;
+                    $product->decrement('stock', $item['quantity']);
+                    $total += $priceSnapshot * $item['quantity'];
                 }
 
                 $order->update(['total_price' => $total]);
 
+                // Update user delivery info for next time
+                $request->user()->update([
+                    'phone' => $validated['phone'],
+                    'city' => $validated['city'],
+                    'zip_code' => $validated['zip_code'],
+                    'address' => $validated['address'],
+                ]);
+
                 return $order;
             });
-        } catch (\RuntimeException $exception) {
+        } catch (\Exception $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
@@ -153,6 +133,7 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Order created successfully',
             'data' => $order->load(['items.product']),
+            'user' => $request->user(),
         ], 201);
     }
 
@@ -218,7 +199,7 @@ class OrderController extends Controller
 
         return response()->json([
             'message' => 'Store orders',
-            'data' => $orders->items(),
+            'data' => collect($orders->items())->map(fn (Order $order) => $this->formatStoreOrder($order))->values(),
             'meta' => [
                 'current_page' => $orders->currentPage(),
                 'last_page' => $orders->lastPage(),
@@ -262,15 +243,24 @@ class OrderController extends Controller
             return response()->json(['message' => 'Order not found for your store'], 404);
         }
 
-        if ($order->status !== 'pending') {
-            return response()->json(['message' => 'Only pending orders can be updated'], 422);
+        $nextStatus = $validated['status'];
+
+        $allowedTransitions = [
+            'pending' => ['confirmed', 'rejected'],
+            'confirmed' => ['delivery', 'rejected'],
+        ];
+
+        if (!isset($allowedTransitions[$order->status]) || !in_array($nextStatus, $allowedTransitions[$order->status], true)) {
+            return response()->json([
+                'message' => 'Invalid status transition from ' . $order->status . ' to ' . $nextStatus,
+            ], 422);
         }
 
-        $order->update(['status' => $validated['status']]);
+        $order->update(['status' => $nextStatus]);
 
         return response()->json([
             'message' => 'Order status updated',
-            'data' => $order->fresh('items.product'),
+            'data' => $this->formatStoreOrder($order->fresh(['items.product', 'client'])),
         ]);
     }
 }
