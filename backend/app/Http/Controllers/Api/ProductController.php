@@ -23,7 +23,15 @@ class ProductController extends Controller
             $query->where('store_id', $request->integer('store_id'));
         }
 
-        $products = $query->paginate(12);
+        if ($request->filled('search')) {
+            $search = $request->string('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $products = $query->paginate(14);
 
         return response()->json([
             'message' => 'Products list',
@@ -68,14 +76,20 @@ class ProductController extends Controller
 
         $product = $store->products()->create([
             'name' => $validated['name'],
-            'description' => $validated['description'],
+            'description' => $validated['description'] ?? null,
             'price' => $validated['price'],
             'stock' => $validated['stock'],
             'category' => $validated['category'],
             'status' => $validated['status'],
+            'sizes' => $validated['sizes'] ?? [],
         ]);
 
-        foreach (($validated['images'] ?? []) as $index => $path) {
+        foreach (($validated['images'] ?? []) as $index => $img) {
+            $path = $img;
+            if ($request->hasFile("images.{$index}")) {
+                $path = $request->file("images.{$index}")->store('products', 'public');
+            }
+
             $product->images()->create([
                 'image_path' => $path,
                 'sort_order' => $index,
@@ -109,7 +123,12 @@ class ProductController extends Controller
         if (array_key_exists('images', $validated)) {
             $product->images()->delete();
 
-            foreach (($validated['images'] ?? []) as $index => $path) {
+            foreach (($validated['images'] ?? []) as $index => $img) {
+                $path = $img;
+                if ($request->hasFile("images.{$index}")) {
+                    $path = $request->file("images.{$index}")->store('products', 'public');
+                }
+
                 $product->images()->create([
                     'image_path' => $path,
                     'sort_order' => $index,
