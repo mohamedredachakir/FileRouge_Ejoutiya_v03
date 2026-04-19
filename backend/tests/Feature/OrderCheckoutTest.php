@@ -220,4 +220,28 @@ class OrderCheckoutTest extends TestCase
         $this->product->refresh();
         $this->assertEquals($initialStock - 3, $this->product->stock);
     }
+
+    public function test_checkout_updates_user_delivery_info()
+    {
+        $cart = Cart::create(['client_id' => $this->client->id]);
+        CartItem::create([
+            'cart_id' => $cart->id,
+            'product_id' => $this->product->id,
+            'quantity' => 1,
+        ]);
+
+        $this->actingAs($this->client)
+            ->postJson('/api/orders/checkout', [
+                'phone' => '0600000000',
+                'city' => 'New City',
+                'zip_code' => '54321',
+                'address' => 'New Address',
+            ]);
+
+        $this->client->refresh();
+        $this->assertEquals('0600000000', $this->client->phone);
+        $this->assertEquals('New City', $this->client->city);
+        $this->assertEquals('54321', $this->client->zip_code);
+        $this->assertEquals('New Address', $this->client->address);
+    }
 }
