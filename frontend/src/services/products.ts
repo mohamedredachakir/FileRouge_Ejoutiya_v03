@@ -6,6 +6,7 @@ export interface ProductFilters {
   sort?: string
   store_id?: number
   page?: number
+  search?: string
 }
 
 export const productsService = {
