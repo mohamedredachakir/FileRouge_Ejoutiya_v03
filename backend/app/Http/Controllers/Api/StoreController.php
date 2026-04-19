@@ -9,12 +9,21 @@ use Illuminate\Http\Request;
 
 class StoreController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $stores = Store::with('user')
-            ->where('status', 'active')
-            ->latest()
-            ->paginate(12);
+        $query = Store::with('user')
+            ->withCount('products')
+            ->where('status', 'active');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('store_name', 'like', "%{$search}%")
+                  ->orWhere('bio', 'like', "%{$search}%");
+            });
+        }
+
+        $stores = $query->latest()->paginate(12);
 
         return response()->json([
             'message' => 'Stores list',
@@ -28,14 +37,33 @@ class StoreController extends Controller
         ]);
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
-        $store = Store::where('status', 'active')
+        $user = $request->user();
+
+        $query = Store::with([
+            'user',
+            'products' => function ($query) use ($user) {
+                $query->with('images');
+
+                if (! $user || $user->role !== 'store_owner') {
+                    $query->where('status', 'active');
+                }
+            },
+        ]);
+
+        if (! $user || $user->role !== 'store_owner') {
+            $query->where('status', 'active');
+        } elseif ($user->role === 'store_owner') {
+            $query->where(function ($storeQuery) use ($user) {
+                $storeQuery->where('status', 'active')
+                    ->orWhere('user_id', $user->id);
+            });
+        }
+
+        $store = $query
             ->with([
                 'user',
-                'products' => function ($query) {
-                    $query->where('status', 'active')->with('images');
-                },
             ])
             ->find($id);
 
@@ -73,15 +101,30 @@ class StoreController extends Controller
         }
 
         $validated = $request->validated();
+        $store = $request->user()->storeProfile()->first();
+
+        $logoPath = $store ? $store->logo : null;
+        if ($request->hasFile('logo')) {
+            $logoPath = $request->file('logo')->store('stores/logos', 'public');
+        } elseif (is_string($request->logo)) {
+            $logoPath = $request->logo;
+        }
+
+        $heroPath = $store ? $store->hero_image : null;
+        if ($request->hasFile('hero_image')) {
+            $heroPath = $request->file('hero_image')->store('stores/heros', 'public');
+        } elseif (is_string($request->hero_image)) {
+            $heroPath = $request->hero_image;
+        }
 
         $store = $request->user()->storeProfile()->updateOrCreate(
             ['user_id' => $request->user()->id],
             [
                 'store_name' => $validated['store_name'],
                 'bio' => $validated['bio'] ?? null,
-                'logo' => $validated['logo'] ?? null,
-                'hero_image' => $validated['hero_image'] ?? null,
-                'status' => 'pending_approval',
+                'logo' => $logoPath,
+                'hero_image' => $heroPath,
+                'status' => $store ? $store->status : 'pending_approval',
             ]
         );
 
