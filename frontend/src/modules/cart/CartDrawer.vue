@@ -11,44 +11,53 @@ const orders = useOrdersStore()
 const auth = useAuthStore()
 const ui = useUiStore()
 
-const phone = ref('')
-const city = ref('')
-const postal = ref('')
-const address = ref('')
 const checkoutLoading = ref(false)
 
-function showCheckout() {
+async function showCheckout() {
   if (!auth.isAuthenticated) {
     ui.openModal('login')
     cart.closeDrawer()
     return
   }
-  cart.checkoutVisible = true
+  
+  if (!auth.user?.phone || !auth.user?.city || !auth.user?.address) {
+    ui.showToast('PLEASE COMPLETE YOUR PROFILE DELIVERY INFO FIRST.', 'error')
+    return
+  }
+
+  if (cart.items.length === 0) {
+    ui.showToast('YOUR CART IS EMPTY.', 'error')
+    return
+  }
+  
+  await confirmOrder()
 }
 
 async function confirmOrder() {
-  if (!phone.value || !city.value || !address.value) {
-    ui.showToast('FILL ALL REQUIRED FIELDS.', 'error')
-    return
-  }
   checkoutLoading.value = true
   try {
     const result = await orders.checkout({
-      phone: phone.value,
-      city: city.value,
-      postal_code: postal.value,
-      address: address.value,
+      phone: auth.user!.phone!,
+      city: auth.user!.city!,
+      zip_code: auth.user!.zip_code || '',
+      address: auth.user!.address!,
+      items: cart.items.map((item) => ({
+        product_id: item.product_id,
+        quantity: item.qty,
+        size: item.size,
+      })),
     })
+    
+    if (result.user) {
+      auth.user = result.user
+    }
+
     const ref = result.reference || 'EJT-' + String(Math.floor(Math.random() * 90000) + 10000)
     cart.confirmOrder(ref)
-    phone.value = ''
-    city.value = ''
-    postal.value = ''
-    address.value = ''
-  } catch {
-    // Generate local order reference on API failure (offline mode)
-    const ref = 'EJT-' + String(Math.floor(Math.random() * 90000) + 10000)
-    cart.confirmOrder(ref)
+    ui.showToast('ORDER CONFIRMED.')
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || 'CHECKOUT FAILED'
+    ui.showToast(msg.toUpperCase(), 'error')
   } finally {
     checkoutLoading.value = false
   }
@@ -65,7 +74,7 @@ async function confirmOrder() {
       <!-- Header -->
       <div class="cd-hdr">
         <span class="cd-title">
-          {{ cart.orderConfirmed ? 'ORDER PLACED' : cart.checkoutVisible ? 'CHECKOUT' : 'CART' }}
+          {{ cart.orderConfirmed ? 'ORDER PLACED' : 'CART' }}
         </span>
         <button class="cd-close" @click="cart.closeDrawer()">×</button>
       </div>
@@ -81,39 +90,6 @@ async function confirmOrder() {
               Your order has been received. Our team will confirm it shortly. Cash on delivery — pay when it arrives.
             </p>
             <button class="btn-cta" style="font-size:9px;padding:12px 24px;margin-top:24px" @click="cart.closeDrawer()">CONTINUE SHOPPING →</button>
-          </div>
-        </div>
-      </template>
-
-      <!-- Checkout form -->
-      <template v-else-if="cart.checkoutVisible">
-        <div class="cd-body" style="overflow-y:auto">
-          <div class="cd-checkout">
-            <div class="cd-checkout-hdr">DELIVERY INFORMATION</div>
-            <div class="form-field">
-              <label class="form-label">Phone *</label>
-              <input v-model="phone" type="tel" class="form-input" placeholder="+212 6 ..." />
-            </div>
-            <div class="form-field">
-              <label class="form-label">City *</label>
-              <input v-model="city" class="form-input" placeholder="Casablanca" />
-            </div>
-            <div class="form-field">
-              <label class="form-label">Postal Code</label>
-              <input v-model="postal" class="form-input" placeholder="20000" />
-            </div>
-            <div class="form-field">
-              <label class="form-label">Address *</label>
-              <input v-model="address" class="form-input" placeholder="123 Rue Mohammed V" />
-            </div>
-            <div style="padding:14px;background:var(--color-surface-1);border:1px solid var(--color-border-1);margin-bottom:18px">
-              <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-soft);margin-bottom:6px">PAYMENT METHOD</div>
-              <div style="font-size:12px;color:var(--color-text-dim)">Cash on Delivery — you pay when your order arrives.</div>
-            </div>
-            <button class="btn-checkout" :disabled="checkoutLoading" @click="confirmOrder">
-              {{ checkoutLoading ? 'PROCESSING...' : 'CONFIRM ORDER →' }}
-            </button>
-            <button class="btn-out" style="width:100%;text-align:center;padding:12px;margin-top:8px;font-size:9px" @click="cart.checkoutVisible = false">CANCEL</button>
           </div>
         </div>
       </template>
@@ -156,7 +132,9 @@ async function confirmOrder() {
             <span>TOTAL</span>
             <span class="cd-tot-v">{{ cart.total }} MAD</span>
           </div>
-          <button class="btn-checkout" @click="showCheckout">CHECKOUT →</button>
+          <button class="btn-checkout" :disabled="checkoutLoading" @click="showCheckout">
+            {{ checkoutLoading ? 'PROCESSING...' : 'PLACE ORDER →' }}
+          </button>
         </div>
       </template>
     </div>
