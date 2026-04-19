@@ -16,13 +16,15 @@ class StoreProductRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'description' => ['required', 'string'],
+            'description' => ['nullable', 'string'],
             'price' => ['required', 'numeric', 'min:0'],
             'stock' => ['required', 'integer', 'min:0'],
             'category' => ['required', Rule::in(['t_shirt', 'hoodie', 'pants', 'sneakers', 'accessories'])],
             'status' => ['required', Rule::in(['active', 'out_of_stock', 'hidden'])],
+            'sizes' => ['nullable', 'array'],
+            'sizes.*' => ['string'],
             'images' => ['nullable', 'array'],
-            'images.*' => ['string', 'max:255'],
+            'images.*' => ['nullable', 'sometimes'],
         ];
     }
 }
