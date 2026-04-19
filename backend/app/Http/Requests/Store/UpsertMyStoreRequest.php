@@ -16,8 +16,8 @@ class UpsertMyStoreRequest extends FormRequest
         return [
             'store_name' => ['required', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
-            'logo' => ['nullable', 'string', 'max:255'],
-            'hero_image' => ['nullable', 'string', 'max:255'],
+            'logo' => ['nullable', 'sometimes'],
+            'hero_image' => ['nullable', 'sometimes'],
         ];
     }
 }
