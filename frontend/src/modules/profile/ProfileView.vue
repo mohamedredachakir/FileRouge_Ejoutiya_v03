@@ -17,6 +17,10 @@ const settingsName = ref(auth.user?.name || '')
 const settingsEmail = ref(auth.user?.email || '')
 const settingsPhone = ref(auth.user?.phone || '')
 const settingsCity = ref(auth.user?.city || '')
+const settingsZip = ref(auth.user?.zip_code || '')
+const settingsAddress = ref(auth.user?.address || '')
+const settingsPassword = ref('')
+const settingsPasswordConfirmation = ref('')
 const savingSettings = ref(false)
 
 onMounted(async () => {
@@ -26,13 +30,36 @@ onMounted(async () => {
   settingsEmail.value = auth.user?.email || ''
   settingsPhone.value = auth.user?.phone || ''
   settingsCity.value = auth.user?.city || ''
+  settingsZip.value = auth.user?.zip_code || ''
+  settingsAddress.value = auth.user?.address || ''
 })
 
 async function saveSettings() {
+  if (settingsPassword.value && settingsPassword.value !== settingsPasswordConfirmation.value) {
+    ui.showToast('PASSWORDS DO NOT MATCH.', 'error')
+    return
+  }
+
   savingSettings.value = true
   try {
-    await auth.updateMe({ name: settingsName.value, email: settingsEmail.value, phone: settingsPhone.value, city: settingsCity.value })
+    const payload: any = { 
+      name: settingsName.value, 
+      email: settingsEmail.value, 
+      phone: settingsPhone.value, 
+      city: settingsCity.value,
+      zip_code: settingsZip.value,
+      address: settingsAddress.value 
+    }
+    
+    if (settingsPassword.value) {
+      payload.password = settingsPassword.value
+      payload.password_confirmation = settingsPasswordConfirmation.value
+    }
+
+    await auth.updateMe(payload)
     ui.showToast('SETTINGS SAVED.')
+    settingsPassword.value = ''
+    settingsPasswordConfirmation.value = ''
   } catch {
     ui.showToast('FAILED TO SAVE.', 'error')
   } finally {
@@ -126,6 +153,25 @@ function formatDate(d: string) {
             <div class="form-field">
               <label class="form-label">City</label>
               <input v-model="settingsCity" class="form-input" placeholder="Casablanca" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Zip Code</label>
+              <input v-model="settingsZip" class="form-input" placeholder="Zip code" />
+            </div>
+            <div class="form-field">
+              <label class="form-label">Address</label>
+              <input v-model="settingsAddress" class="form-input" placeholder="Your Address" />
+            </div>
+            <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--color-border-1)">
+              <div class="profile-sec-h" style="font-size:9px">SECURITY — CHANGE PASSWORD (LEAVE BLANK IF NO CHANGE)</div>
+              <div class="form-field">
+                <label class="form-label">New Password</label>
+                <input v-model="settingsPassword" type="password" class="form-input" placeholder="••••••••" />
+              </div>
+              <div class="form-field">
+                <label class="form-label">Confirm New Password</label>
+                <input v-model="settingsPasswordConfirmation" type="password" class="form-input" placeholder="••••••••" />
+              </div>
             </div>
             <button class="btn-cta" style="font-size:10px;padding:12px 24px" :disabled="savingSettings" @click="saveSettings">
               {{ savingSettings ? '...' : 'SAVE CHANGES →' }}
