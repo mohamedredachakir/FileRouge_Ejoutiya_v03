@@ -31,7 +31,10 @@ const allImages = computed(() => {
   const imgs: string[] = []
   if (product.value.main_image_url) imgs.push(product.value.main_image_url)
   if (product.value.images) {
-    product.value.images.forEach(i => { if (!imgs.includes(i.url)) imgs.push(i.url) })
+    product.value.images.forEach((i: any) => {
+      const imageUrl = i.image_url || i.url
+      if (imageUrl && !imgs.includes(imageUrl)) imgs.push(imageUrl)
+    })
   }
   if (imgs.length === 0) imgs.push('')
   return imgs
@@ -44,19 +47,19 @@ function pickSize(sz: string) {
   sizeError.value = false
 }
 
-function addToCart() {
+async function addToCart() {
   if (!selectedSize.value) { sizeError.value = true; return }
   if (!product.value) return
-  cart.addItem({
+  ui.showToast('ADDED TO CART.')
+  await cart.addItem({
     product_id: product.value.id,
     product_name: product.value.name,
     product_price: product.value.price,
     product_category: product.value.category,
     main_image_url: product.value.main_image_url,
-    store_name: product.value.store?.name || '—',
+    store_name: product.value.store?.store_name || '—',
     size: selectedSize.value,
   })
-  ui.showToast('ADDED TO CART.')
   cart.openDrawer()
 }
 
@@ -90,7 +93,7 @@ function goToStore() {
         </div>
         <div class="det-thumbs">
           <div
-            v-for="(img, idx) in allImages.slice(0, 4)"
+            v-for="(img, idx) in allImages"
             :key="idx"
             class="det-thumb"
             :class="{ on: selectedThumb === idx }"
@@ -109,16 +112,17 @@ function goToStore() {
         <div class="det-price">
           <span v-if="product.original_price" class="det-oldprice">{{ product.original_price }} MAD</span>
           {{ product.price }} MAD
+          <span v-if="product.stock > 0 && product.stock < 3" class="low-stock-pill">ONLY {{ product.stock }} LEFT</span>
         </div>
         <div class="det-div" />
 
         <!-- Store row -->
         <div v-if="product.store" class="det-store-row" @click="goToStore">
           <div class="sc-logo">
-            <ImageFallback :src="product.store.logo_url" :fallback-text="product.store.name.slice(0,2)" :alt="product.store.name" />
+            <ImageFallback :src="product.store.logo_url" :fallback-text="product.store.store_name.slice(0,2)" :alt="product.store.store_name" />
           </div>
           <div>
-            <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase">{{ product.store.name }}</div>
+            <div style="font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase">{{ product.store.store_name }}</div>
             <div style="font-size:10px;color:var(--color-text-soft);margin-top:2px">{{ product.store.products_count || '' }} PRODUCTS</div>
           </div>
           <div style="margin-left:auto;font-family:'Space Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--color-text-dim)">VISIT STORE →</div>
