@@ -17,10 +17,14 @@ class RegisterStoreRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'phone' => ['required', 'string', 'max:20'],
+            'city' => ['required', 'string', 'max:255'],
+            'zip_code' => ['required', 'string', 'max:20'],
+            'address' => ['required', 'string'],
             'store_name' => ['required', 'string', 'max:255'],
             'bio' => ['nullable', 'string'],
-            'logo' => ['nullable', 'string', 'max:255'],
-            'hero_image' => ['nullable', 'string', 'max:255'],
+            'logo' => ['nullable', 'image', 'max:2048'],
+            'hero_image' => ['nullable', 'image', 'max:5120'],
         ];
     }
 }
