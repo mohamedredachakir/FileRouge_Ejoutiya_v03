@@ -112,6 +112,18 @@ async function handleLogout() {
       >
         {{ auth.user?.name?.split(' ')[0]?.toUpperCase() || 'ACCOUNT' }}
       </button>
+
+      <button
+        class="nav-icon search-trig"
+        style="color:var(--color-text-dim);padding:4px;transition:color .15s;cursor:pointer;background:none;border:none;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px"
+        @click="ui.openModal('search')"
+        @mouseenter="($event.target as HTMLElement).style.color='var(--color-text)'"
+        @mouseleave="($event.target as HTMLElement).style.color='var(--color-text-dim)'"
+      >
+        <span style="font-size:14px">⌕</span>
+        <span class="search-label">SEARCH</span>
+      </button>
+
       <button
         v-if="!isGuest && !auth.isClient"
         class="nav-icon"
