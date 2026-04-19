@@ -22,8 +22,8 @@ class EnsureStoreApproved
             return response()->json(['message' => 'Store profile not found.'], 404);
         }
 
-        if ($store->status !== 'active') {
-            return response()->json(['message' => 'Store is not approved yet.'], 403);
+        if (in_array($store->status, ['suspended', 'rejected'], true)) {
+            return response()->json(['message' => 'Store is not allowed to manage products.'], 403);
         }
 
         return $next($request);
