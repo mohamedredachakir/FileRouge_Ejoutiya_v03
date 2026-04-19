@@ -14,7 +14,7 @@ class UpdateOrderStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', 'in:confirmed,rejected'],
+            'status' => ['required', 'in:confirmed,delivery,rejected'],
         ];
     }
 }
