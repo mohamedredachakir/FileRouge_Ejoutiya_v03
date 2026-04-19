@@ -36,18 +36,18 @@ function getBadge(p: Product) {
   return ''
 }
 
-function quickAdd(p: Product, sz: string, e: Event) {
+async function quickAdd(p: Product, sz: string, e: Event) {
   e.stopPropagation()
-  cart.addItem({
+  ui.showToast('ADDED TO CART.')
+  await cart.addItem({
     product_id: p.id,
     product_name: p.name,
     product_price: p.price,
     product_category: p.category,
     main_image_url: p.main_image_url,
-    store_name: store.value?.name || '—',
+    store_name: store.value?.store_name || '—',
     size: sz,
   })
-  ui.showToast('ADDED TO CART.')
 }
 </script>
 
@@ -60,9 +60,9 @@ function quickAdd(p: Product, sz: string, e: Event) {
       <!-- Hero -->
       <div class="store-hero texture">
         <div class="store-hero-bg">
-          <ImageFallback :src="store.hero_image_url" :fallback-text="store.name" :alt="store.name" />
+          <ImageFallback :src="store.hero_image_url" :fallback-text="store.store_name" :alt="store.store_name" />
         </div>
-        <div class="store-hero-ghost">{{ store.name }}</div>
+        <div class="store-hero-ghost">{{ store.store_name }}</div>
         <div class="store-hero-grad" />
         <div class="store-hero-body">
           <button
@@ -72,10 +72,10 @@ function quickAdd(p: Product, sz: string, e: Event) {
             @mouseleave="($event.target as HTMLElement).style.color='var(--color-text-dim)'"
           >← ALL BRANDS</button>
           <div class="store-logo-lg">
-            <ImageFallback :src="store.logo_url" :fallback-text="store.name.slice(0,2)" :alt="store.name" />
+            <ImageFallback :src="store.logo_url" :fallback-text="store.store_name.slice(0,2)" :alt="store.store_name" />
           </div>
           <div class="store-hero-info">
-            <div class="store-name-lg">{{ store.name }}</div>
+            <div class="store-name-lg">{{ store.store_name }}</div>
             <div class="store-bio-lg">{{ store.bio }}</div>
           </div>
           <BaseBadge :variant="store.status" :text="store.status.replace('_', ' ').toUpperCase()" />
@@ -85,11 +85,11 @@ function quickAdd(p: Product, sz: string, e: Event) {
       <!-- Marquee -->
       <div class="mq">
         <div class="mq-inner">
-          <span class="mq-seg">{{ store.name }}</span><span class="mq-dot">///</span>
+          <span class="mq-seg">{{ store.store_name }}</span><span class="mq-dot">///</span>
           <span class="mq-seg">OFFICIAL STORE</span><span class="mq-dot">///</span>
           <span class="mq-seg">{{ catalog.total }} PRODUCTS</span><span class="mq-dot">///</span>
           <span class="mq-seg">CASH ON DELIVERY</span><span class="mq-dot">///</span>
-          <span class="mq-seg">{{ store.name }}</span><span class="mq-dot">///</span>
+          <span class="mq-seg">{{ store.store_name }}</span><span class="mq-dot">///</span>
           <span class="mq-seg">OFFICIAL STORE</span><span class="mq-dot">///</span>
           <span class="mq-seg">{{ catalog.total }} PRODUCTS</span><span class="mq-dot">///</span>
           <span class="mq-seg">CASH ON DELIVERY</span><span class="mq-dot">///</span>
@@ -135,6 +135,7 @@ function quickAdd(p: Product, sz: string, e: Event) {
                     v-for="sz in (p.sizes || ['S','M','L','XL'])"
                     :key="sz"
                     class="sz-btn"
+                    :disabled="p.stock === 0"
                     @click.stop="quickAdd(p, sz, $event)"
                   >{{ sz }}</button>
                 </div>
@@ -142,7 +143,7 @@ function quickAdd(p: Product, sz: string, e: Event) {
               <div class="pc-info">
                 <div>
                   <div class="pc-name">{{ p.name }}</div>
-                  <div class="pc-sub">{{ store.name }}</div>
+                  <div class="pc-sub">{{ store.store_name }}</div>
                 </div>
                 <div class="pc-price">
                   <span v-if="p.original_price" class="pc-price-old">{{ p.original_price }} MAD</span>
