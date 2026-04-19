@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   src?: string | null
@@ -19,8 +19,15 @@ function resolveUrl(url?: string | null): string | undefined {
   return url
 }
 
-const imgSrc = ref(resolveUrl(props.src))
+const imgSrc = computed(() => resolveUrl(props.src))
 const error = ref(!imgSrc.value)
+
+watch(
+  () => props.src,
+  () => {
+    error.value = !imgSrc.value
+  }
+)
 
 function onError() { error.value = true }
 </script>
