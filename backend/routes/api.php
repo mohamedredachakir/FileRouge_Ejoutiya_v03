@@ -23,11 +23,11 @@ Route::get('/products/{id}', [ProductController::class, 'show']);
 
 Route::middleware(['auth:sanctum', 'not.banned', 'role:client,store_owner,admin'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [ProfileController::class, 'me']);
+    Route::put('/me', [ProfileController::class, 'update']);
 });
 
 Route::middleware(['auth:sanctum', 'not.banned', 'role:client'])->group(function () {
-    Route::get('/me', [ProfileController::class, 'me']);
-    Route::put('/me', [ProfileController::class, 'update']);
     Route::get('/cart', [\App\Http\Controllers\Api\CartController::class, 'show']);
     Route::post('/cart/items', [\App\Http\Controllers\Api\CartController::class, 'addItem']);
     Route::put('/cart/items/{productId}', [\App\Http\Controllers\Api\CartController::class, 'updateItem']);
