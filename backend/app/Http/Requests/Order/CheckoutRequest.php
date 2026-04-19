@@ -18,6 +18,10 @@ class CheckoutRequest extends FormRequest
             'city' => ['required', 'string', 'max:255'],
             'zip_code' => ['required', 'string', 'max:30'],
             'address' => ['required', 'string', 'max:500'],
+            'items' => ['sometimes', 'array', 'min:1'],
+            'items.*.product_id' => ['required_with:items', 'integer', 'exists:products,id'],
+            'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+            'items.*.size' => ['required_with:items', 'string', 'max:50'],
         ];
     }
 }
