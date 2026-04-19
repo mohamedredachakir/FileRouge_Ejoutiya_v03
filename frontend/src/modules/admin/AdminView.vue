@@ -22,6 +22,10 @@ onMounted(async () => {
 
 async function setTab(tab: string) { activeTab.value = tab }
 
+function openStorePreview(id: number) {
+  router.push({ name: 'store-detail', params: { id } })
+}
+
 function askAction(type: string, id: number, label: string) {
   confirmAction.value = { type, id, label }
 }
@@ -79,12 +83,14 @@ function statusLabel(s: string) { return s.replace(/_/g, ' ').toUpperCase() }
           <div v-else-if="admin.users.length">
             <table class="prod-table">
               <thead>
-                <tr><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>JOINED</th><th></th></tr>
+                <tr><th>NAME</th><th>EMAIL</th><th>PHONE</th><th>CITY</th><th>ROLE</th><th>STATUS</th><th>JOINED</th><th></th></tr>
               </thead>
               <tbody>
                 <tr v-for="u in admin.users" :key="u.id">
                   <td style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--color-text)">{{ u.name }}</td>
                   <td style="font-size:11px">{{ u.email }}</td>
+                  <td style="font-size:11px">{{ u.phone || '—' }}</td>
+                  <td style="font-size:11px;text-transform:uppercase">{{ u.city || '—' }}</td>
                   <td>
                     <BaseBadge :variant="u.role === 'admin' ? 'confirmed' : u.role === 'store_owner' ? 'active' : 'hidden'" :text="u.role.replace('_', ' ').toUpperCase()" />
                   </td>
@@ -129,25 +135,29 @@ function statusLabel(s: string) { return s.replace(/_/g, ' ').toUpperCase() }
               </thead>
               <tbody>
                 <tr v-for="s in admin.stores" :key="s.id">
-                  <td style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--color-text)">{{ s.name }}</td>
+                  <td style="font-family:'Space Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--color-text)">{{ s.store_name }}</td>
                   <td style="font-size:11px">{{ s.owner?.name || '—' }}</td>
                   <td><BaseBadge :variant="s.status" :text="statusLabel(s.status)" /></td>
                   <td style="font-family:'Space Mono',monospace;font-size:11px">{{ s.products_count || 0 }}</td>
                   <td style="white-space:nowrap">
                     <button
+                      class="tbl-btn"
+                      @click="openStorePreview(s.id)"
+                    >PREVIEW</button>
+                    <button
                       v-if="s.status === 'pending_approval'"
                       class="tbl-btn"
-                      @click="askAction('approve', s.id, 'APPROVE ' + s.name)"
+                      @click="askAction('approve', s.id, 'APPROVE ' + s.store_name)"
                     >APPROVE</button>
                     <button
                       v-if="s.status === 'active'"
                       class="tbl-btn del"
-                      @click="askAction('suspend', s.id, 'SUSPEND ' + s.name)"
+                      @click="askAction('suspend', s.id, 'SUSPEND ' + s.store_name)"
                     >SUSPEND</button>
                     <button
                       v-if="s.status !== 'rejected'"
                       class="tbl-btn del"
-                      @click="askAction('reject', s.id, 'REJECT ' + s.name)"
+                      @click="askAction('reject', s.id, 'REJECT ' + s.store_name)"
                     >REJECT</button>
                   </td>
                 </tr>
