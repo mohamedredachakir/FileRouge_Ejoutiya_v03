@@ -20,6 +20,9 @@ export const cartService = {
   async removeItem(itemId: number) {
     await api.delete(`/cart/items/${itemId}`)
   },
+  async removeItemByProduct(productId: number, size: string) {
+    await api.delete(`/cart/items/${productId}`, { params: { size } })
+  },
   async clearCart() {
     await api.delete('/cart')
   },
