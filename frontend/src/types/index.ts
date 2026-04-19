@@ -4,6 +4,8 @@ export interface User {
   email: string
   phone?: string
   city?: string
+  zip_code?: string
+  address?: string
   role: 'client' | 'store_owner' | 'admin'
   is_banned: boolean
   created_at: string
@@ -11,13 +13,14 @@ export interface User {
 
 export interface ProductImage {
   id: number
-  url: string
+  url?: string
+  image_url?: string
   sort_order: number
 }
 
 export interface Store {
   id: number
-  name: string
+  store_name: string
   bio: string
   logo_url?: string
   hero_image_url?: string
@@ -61,6 +64,7 @@ export interface OrderItem {
   size: string
   quantity: number
   unit_price: number
+  price?: number
 }
 
 export interface Order {
@@ -68,9 +72,10 @@ export interface Order {
   reference: string
   status: 'pending' | 'confirmed' | 'delivery' | 'rejected'
   total: number
+  total_price?: number
   phone: string
   city: string
-  postal_code?: string
+  zip_code: string
   address: string
   items: OrderItem[]
   store?: Store
