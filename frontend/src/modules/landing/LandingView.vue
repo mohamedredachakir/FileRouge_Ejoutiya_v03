@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCatalogStore } from '../../stores/catalog'
 import { useStoresCatalogStore } from '../../stores/storesCatalog'
 import { useCartStore } from '../../stores/cart'
 import { useUiStore } from '../../stores/ui'
 import ImageFallback from '../../components/base/ImageFallback.vue'
+
+// Import all background images from assets/bg folder
+const heroImages = Object.values(import.meta.glob('../../assets/bg/*.jpg', { eager: true, import: 'default' })) as string[]
 
 import AppFooter from '../../components/layout/AppFooter.vue'
 import { CATEGORY_LABELS } from '../../types'
@@ -20,6 +23,12 @@ const ui = useUiStore()
 const featuredProducts = ref<Product[]>([])
 const featuredStores = ref<Store[]>([])
 const loading = ref(true)
+const currentImgIdx = ref(0)
+let timer: any = null
+
+function nextImg() {
+  currentImgIdx.value = (currentImgIdx.value + 1) % heroImages.length
+}
 
 const categories = [
   { key: 'hoodie', label: 'HOODIES', sub: 'The backbone of any fit.' },
@@ -30,6 +39,7 @@ const categories = [
 ]
 
 onMounted(async () => {
+  timer = setInterval(nextImg, 8000)
   try {
     await Promise.all([
       catalog.fetchProducts({ sort: 'new' }),
@@ -44,21 +54,25 @@ onMounted(async () => {
   }
 })
 
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
 function goToProduct(id: number) { router.push({ name: 'product-detail', params: { id } }) }
 function goToStore(id: number) { router.push({ name: 'store-detail', params: { id } }) }
 function goToCategory(cat: string) { router.push({ name: 'products', query: { category: cat } }) }
 
-function quickAdd(p: Product, size: string) {
-  cart.addItem({
+async function quickAdd(p: Product, size: string) {
+  ui.showToast('ADDED TO CART.')
+  await cart.addItem({
     product_id: p.id,
     product_name: p.name,
     product_price: p.price,
     product_category: p.category,
     main_image_url: p.main_image_url,
-    store_name: p.store?.name || '—',
+    store_name: p.store?.store_name || '—',
     size,
   })
-  ui.showToast('ADDED TO CART.')
 }
 
 function getBadge(p: Product) {
@@ -71,8 +85,19 @@ function getBadge(p: Product) {
 
 <template>
   <div>
-    <!-- HERO -->
-    <section class="hero-wrap texture" style="min-height:100vh;background:var(--color-bg)">
+    <!-- HERO SLIDER -->
+    <section class="hero-wrap texture">
+      <!-- Slider Layers -->
+      <div class="hero-slider">
+        <Transition name="hero-slide">
+          <div 
+            :key="currentImgIdx" 
+            class="hero-slide-item" 
+            :style="{ backgroundImage: `linear-gradient(rgba(5,5,5,0.4), rgba(5,5,5,0.6)), url(${heroImages[currentImgIdx]})` }"
+          />
+        </Transition>
+      </div>
+
       <div class="hero-grid-lines">
         <div v-for="i in 6" :key="i" class="hero-grid-line" />
       </div>
@@ -144,6 +169,7 @@ function getBadge(p: Product) {
                   :key="sz"
                   class="sz-btn"
                   :class="{ oos: p.stock === 0 }"
+                  :disabled="p.stock === 0"
                   @click.stop="quickAdd(p, sz)"
                 >{{ sz }}</button>
               </div>
@@ -151,7 +177,7 @@ function getBadge(p: Product) {
             <div class="pc-info">
               <div>
                 <div class="pc-name">{{ p.name }}</div>
-                <div class="pc-sub">{{ p.store?.name || '—' }}</div>
+                <div class="pc-sub">{{ p.store?.store_name || '—' }}</div>
               </div>
               <div class="pc-price">
                 <span v-if="p.original_price" class="pc-price-old">{{ p.original_price }} MAD</span>
@@ -239,15 +265,15 @@ function getBadge(p: Product) {
             @click="goToStore(s.id)"
           >
             <div class="sc-cover">
-              <ImageFallback :src="s.hero_image_url" :fallback-text="s.name" :alt="s.name" />
+              <ImageFallback :src="s.hero_image_url" :fallback-text="s.store_name" :alt="s.store_name" />
             </div>
             <div class="sc-info">
               <div class="sc-head">
                 <div class="sc-logo">
-                  <ImageFallback :src="s.logo_url" :fallback-text="s.name.slice(0,2)" :alt="s.name" />
+                  <ImageFallback :src="s.logo_url" :fallback-text="s.store_name.slice(0,2)" :alt="s.store_name" />
                 </div>
                 <div>
-                  <div class="sc-name">{{ s.name }}</div>
+                  <div class="sc-name">{{ s.store_name }}</div>
                 </div>
               </div>
               <div class="sc-bio">{{ s.bio }}</div>
