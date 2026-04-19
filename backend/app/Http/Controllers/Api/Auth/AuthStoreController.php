@@ -17,13 +17,25 @@ class AuthStoreController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'phone' => $validated['phone'],
+            'city' => $validated['city'],
+            'zip_code' => $validated['zip_code'],
+            'address' => $validated['address'],
         ]);
 
-        $user->storeProfile()->create([
+        $logoPath = $request->hasFile('logo') 
+            ? $request->file('logo')->store('stores/logos', 'public') 
+            : null;
+            
+        $heroPath = $request->hasFile('hero_image') 
+            ? $request->file('hero_image')->store('stores/heros', 'public') 
+            : null;
+
+        $user->store()->create([
             'store_name' => $validated['store_name'],
             'bio' => $validated['bio'] ?? null,
-            'logo' => $validated['logo'] ?? null,
-            'hero_image' => $validated['hero_image'] ?? null,
+            'logo' => $logoPath,
+            'hero_image' => $heroPath,
             'status' => 'pending_approval',
         ]);
 
@@ -32,7 +44,7 @@ class AuthStoreController extends Controller
         return response()->json([
             'message' => 'Store register success',
             'token' => $token,
-            'user' => $user->load('storeProfile'),
+            'user' => $user->load('store'),
         ], 201);
     }
 }
