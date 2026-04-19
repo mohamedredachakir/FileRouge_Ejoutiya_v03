@@ -16,11 +16,16 @@ use Illuminate\Database\Eloquent\Model;
     'price',
     'stock',
     'category',
-    'status'
+    'status',
+    'sizes'
 ])]
 class Product extends Model
 {
     use HasFactory;
+
+    protected $casts = [
+        'sizes' => 'array',
+    ];
 
     protected $appends = ['main_image_url'];
 
