@@ -5,6 +5,7 @@ import AppHeader from './components/layout/AppHeader.vue'
 import RouteTransitionShell from './components/layout/RouteTransitionShell.vue'
 import CartDrawer from './modules/cart/CartDrawer.vue'
 import AuthModal from './modules/auth/AuthModal.vue'
+import SearchModal from './components/common/SearchModal.vue'
 import BaseToast from './components/base/BaseToast.vue'
 import { useAuthStore } from './stores/auth'
 import { useUiStore } from './stores/ui'
@@ -16,6 +17,9 @@ const router = useRouter()
 onMounted(async () => {
   if (auth.token) {
     await auth.fetchMe()
+    const { useCartStore } = await import('./stores/cart')
+    const cart = useCartStore()
+    await cart.syncWithBackend()
   }
   window.addEventListener('ejoutiya:unauthorized', () => {
     auth.clearAuth()
@@ -34,5 +38,6 @@ onMounted(async () => {
   <RouteTransitionShell />
   <CartDrawer />
   <AuthModal />
+  <SearchModal />
   <BaseToast />
 </template>
