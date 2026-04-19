@@ -22,6 +22,10 @@ class ProfileController extends Controller
 
         $validated = $request->validated();
 
+        if (isset($validated['password'])) {
+            $validated['password'] = \Illuminate\Support\Facades\Hash::make($validated['password']);
+        }
+
         $user->update($validated);
 
         return response()->json([
