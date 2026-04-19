@@ -21,8 +21,10 @@ class UpdateProductRequest extends FormRequest
             'stock' => ['sometimes', 'integer', 'min:0'],
             'category' => ['sometimes', Rule::in(['t_shirt', 'hoodie', 'pants', 'sneakers', 'accessories'])],
             'status' => ['sometimes', Rule::in(['active', 'out_of_stock', 'hidden'])],
+            'sizes' => ['sometimes', 'array'],
+            'sizes.*' => ['string'],
             'images' => ['sometimes', 'array'],
-            'images.*' => ['string', 'max:255'],
+            'images.*' => ['nullable', 'sometimes'],
         ];
     }
 }
