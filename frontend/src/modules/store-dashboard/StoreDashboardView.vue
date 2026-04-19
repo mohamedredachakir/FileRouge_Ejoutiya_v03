@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useUiStore } from '../../stores/ui'
@@ -8,7 +9,7 @@ import BaseBadge from '../../components/base/BaseBadge.vue'
 import ConfirmDialog from '../../components/base/ConfirmDialog.vue'
 import ImageFallback from '../../components/base/ImageFallback.vue'
 import type { Store, Product, Order } from '../../types'
-import { CATEGORY_LABELS } from '../../types'
+import { CATEGORY_LABELS, SIZES } from '../../types'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -27,7 +28,11 @@ const loadingOrders = ref(false)
 const storeFormName = ref('')
 const storeFormBio = ref('')
 const storeFormLogo = ref('')
+const storeFormLogoFile = ref<File | null>(null)
+const storeFormLogoPreview = ref('')
 const storeFormCover = ref('')
+const storeFormCoverFile = ref<File | null>(null)
+const storeFormCoverPreview = ref('')
 const savingStore = ref(false)
 
 // Product drawer
@@ -42,7 +47,9 @@ const pdStock = ref<number | null>(null)
 const pdCategory = ref('hoodie')
 const pdStatus = ref('active')
 const pdImages = ref('')
-const pdSizes = ref('S,M,L,XL')
+const pdSizes = ref<string[]>(['S', 'M', 'L', 'XL'])
+const pdImageFiles = ref<File[]>([])
+const pdImagePreviews = ref<string[]>([])
 const savingProduct = ref(false)
 
 // Confirm delete
@@ -67,7 +74,7 @@ async function loadStore() {
   loadingStore.value = true
   try {
     myStore.value = await storeDashboardService.getMyStore()
-    storeFormName.value = myStore.value.name
+    storeFormName.value = myStore.value.store_name
     storeFormBio.value = myStore.value.bio || ''
     storeFormLogo.value = myStore.value.logo_url || ''
     storeFormCover.value = myStore.value.hero_image_url || ''
@@ -108,15 +115,54 @@ async function setTab(tab: string) {
   if (tab === 'orders') await loadOrders()
 }
 
+function openStorePreview() {
+  if (!myStore.value?.id) return
+  router.push({ name: 'store-detail', params: { id: myStore.value.id } })
+}
+
+function clearStorePreviews() {
+  if (storeFormLogoPreview.value) URL.revokeObjectURL(storeFormLogoPreview.value)
+  if (storeFormCoverPreview.value) URL.revokeObjectURL(storeFormCoverPreview.value)
+  storeFormLogoPreview.value = ''
+  storeFormCoverPreview.value = ''
+}
+
+function handleLogoFile(e: Event) {
+  const t = e.target as HTMLInputElement
+  const file = t.files?.[0]
+  if (!file) return
+  if (storeFormLogoPreview.value) URL.revokeObjectURL(storeFormLogoPreview.value)
+  storeFormLogoFile.value = file
+  storeFormLogoPreview.value = URL.createObjectURL(file)
+}
+
+function handleCoverFile(e: Event) {
+  const t = e.target as HTMLInputElement
+  const file = t.files?.[0]
+  if (!file) return
+  if (storeFormCoverPreview.value) URL.revokeObjectURL(storeFormCoverPreview.value)
+  storeFormCoverFile.value = file
+  storeFormCoverPreview.value = URL.createObjectURL(file)
+}
+
 async function saveStore() {
   savingStore.value = true
   try {
-    myStore.value = await storeDashboardService.updateMyStore({
-      name: storeFormName.value,
-      bio: storeFormBio.value,
-      logo_url: storeFormLogo.value,
-      hero_image_url: storeFormCover.value,
-    })
+    const fd = new FormData()
+    fd.append('store_name', storeFormName.value)
+    fd.append('bio', storeFormBio.value)
+    if (storeFormLogoFile.value) fd.append('logo', storeFormLogoFile.value)
+    else fd.append('logo', storeFormLogo.value)
+    
+    if (storeFormCoverFile.value) fd.append('hero_image', storeFormCoverFile.value)
+    else fd.append('hero_image', storeFormCover.value)
+
+    myStore.value = await storeDashboardService.updateMyStore(fd as any)
+    storeFormLogo.value = myStore.value.logo_url || ''
+    storeFormCover.value = myStore.value.hero_image_url || ''
+    storeFormLogoFile.value = null
+    storeFormCoverFile.value = null
+    clearStorePreviews()
     ui.showToast('STORE SAVED.')
   } catch {
     ui.showToast('FAILED TO SAVE.', 'error')
@@ -126,6 +172,9 @@ async function saveStore() {
 }
 
 function openProdDrawer(p: Product | null) {
+  pdImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
+  pdImagePreviews.value = []
+  pdImageFiles.value = []
   editingProduct.value = p
   if (p) {
     pdId.value = p.id
@@ -135,13 +184,20 @@ function openProdDrawer(p: Product | null) {
     pdStock.value = p.stock
     pdCategory.value = p.category
     pdStatus.value = p.status
-    pdImages.value = p.main_image_url || ''
-    pdSizes.value = (p.sizes || ['S', 'M', 'L', 'XL']).join(',')
+    const existingImageUrls = (p.images || [])
+      .map((image: any) => image?.image_url || image?.url)
+      .filter((value: string | undefined): value is string => Boolean(value))
+
+    pdImages.value = existingImageUrls.length > 0
+      ? existingImageUrls.join('\n')
+      : (p.main_image_url || '')
+    pdSizes.value = (p.sizes && p.sizes.length > 0) ? [...p.sizes] : ['S', 'M', 'L', 'XL']
   } else {
     pdId.value = null; pdName.value = ''; pdDesc.value = ''
     pdPrice.value = null; pdStock.value = null
     pdCategory.value = 'hoodie'; pdStatus.value = 'active'
-    pdImages.value = ''; pdSizes.value = 'S,M,L,XL'
+    pdImages.value = ''; pdSizes.value = ['S', 'M', 'L', 'XL']
+    pdImageFiles.value = []
   }
   drawerOpen.value = true
   setTimeout(() => { drawerOverlay.value = true }, 10)
@@ -150,35 +206,90 @@ function openProdDrawer(p: Product | null) {
 function closeProdDrawer() {
   drawerOpen.value = false
   drawerOverlay.value = false
+  pdImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
+  pdImagePreviews.value = []
 }
+
+function handleProductImages(e: Event) {
+  const t = e.target as HTMLInputElement
+  const files = t.files ? Array.from(t.files) : []
+
+  pdImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
+  pdImageFiles.value = files
+  pdImagePreviews.value = files.map((file) => URL.createObjectURL(file))
+}
+
+function toggleSize(size: string) {
+  if (pdSizes.value.includes(size)) {
+    pdSizes.value = pdSizes.value.filter((item) => item !== size)
+    return
+  }
+
+  pdSizes.value = [...pdSizes.value, size]
+}
+
+const productImagePreviewUrls = computed(() => {
+  const urls = pdImages.value.split('\n').map((s) => s.trim()).filter(Boolean)
+  return [...urls, ...pdImagePreviews.value]
+})
+
+onBeforeUnmount(() => {
+  clearStorePreviews()
+  pdImagePreviews.value.forEach((url) => URL.revokeObjectURL(url))
+})
 
 async function saveProd() {
   if (!pdName.value || !pdPrice.value || !pdStock.value) { ui.showToast('FILL REQUIRED FIELDS.', 'error'); return }
   savingProduct.value = true
   try {
-    const payload = {
-      name: pdName.value,
-      description: pdDesc.value,
-      price: Number(pdPrice.value),
-      stock: Number(pdStock.value),
-      category: pdCategory.value,
-      status: pdStatus.value,
-      sizes: pdSizes.value.split(',').map((s: string) => s.trim()).filter(Boolean),
-      image_urls: pdImages.value.split('\n').map((s: string) => s.trim()).filter(Boolean),
-    }
+    const fd = new FormData()
+    fd.append('name', pdName.value)
+    fd.append('description', pdDesc.value)
+    fd.append('price', String(pdPrice.value))
+    fd.append('stock', String(pdStock.value))
+    fd.append('category', pdCategory.value)
+    fd.append('status', pdStatus.value)
+    
+    // Add sizes
+    pdSizes.value.forEach((s, i) => fd.append(`sizes[${i}]`, s))
+
+    // Add existing image URLs (if any)
+    const urls = pdImages.value.split('\n').map(s => s.trim()).filter(Boolean)
+    let urlCount = 0;
+    urls.forEach((url) => {
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/storage/') || url.startsWith('storage/')) {
+        fd.append(`images[${urlCount}]`, url)
+        urlCount++;
+      }
+    })
+
+    // Add new image files
+    pdImageFiles.value.forEach((file, i) => {
+      fd.append(`images[${urlCount + i}]`, file)
+    })
+
     if (pdId.value) {
-      const updated = await storeDashboardService.updateProduct(pdId.value, payload)
+      const updated = await storeDashboardService.updateProduct(pdId.value, fd as any)
       const idx = products.value.findIndex((p: Product) => p.id === pdId.value)
       if (idx !== -1) products.value[idx] = updated
       ui.showToast('PRODUCT UPDATED.')
     } else {
-      const created = await storeDashboardService.createProduct(payload)
+      const created = await storeDashboardService.createProduct(fd as any)
       products.value.unshift(created)
       ui.showToast('PRODUCT CREATED.')
     }
     closeProdDrawer()
-  } catch {
-    ui.showToast('FAILED TO SAVE PRODUCT.', 'error')
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const message = error.response?.data?.message
+      const firstValidationError = error.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat()[0]
+        : null
+
+      ui.showToast(String(firstValidationError || message || 'FAILED TO SAVE PRODUCT.'), 'error')
+    } else {
+      ui.showToast('FAILED TO SAVE PRODUCT.', 'error')
+    }
   } finally {
     savingProduct.value = false
   }
@@ -206,7 +317,12 @@ async function updateOrderStatus(orderId: number, status: string) {
     const idx = storeOrders.value.findIndex((o: Order) => o.id === orderId)
     if (idx !== -1) storeOrders.value[idx] = updated
     ui.showToast('ORDER STATUS UPDATED.')
-  } catch {
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      const message = error.response?.data?.message
+      ui.showToast(String(message || 'UPDATE FAILED.'), 'error')
+      return
+    }
     ui.showToast('UPDATE FAILED.', 'error')
   }
 }
@@ -224,7 +340,18 @@ async function logout() {
 function statusLabel(s: string) { return s.replace(/_/g, ' ').toUpperCase() }
 
 function formatPrice(n: number) {
-  return n.toLocaleString('fr-DZ', { minimumFractionDigits: 0 }) + ' DA'
+  return n.toLocaleString('en-MA', { minimumFractionDigits: 0 }) + ' MAD'
+}
+
+function orderTotal(order: Order) {
+  const directTotal = (order as any).total ?? (order as any).total_price
+  if (typeof directTotal === 'number') return directTotal
+
+  return (order.items || []).reduce((sum, item: any) => {
+    const unit = item.unit_price ?? item.price ?? 0
+    const qty = item.quantity ?? 0
+    return sum + Number(unit) * Number(qty)
+  }, 0)
 }
 </script>
 
@@ -236,7 +363,7 @@ function formatPrice(n: number) {
       <div style="padding:28px 20px 20px;">
         <div style="font-size:11px;letter-spacing:3px;color:#555;margin-bottom:8px;">STORE DASHBOARD</div>
         <div style="font-size:15px;font-weight:700;letter-spacing:1px;color:#fff;margin-bottom:6px;">
-          {{ myStore?.name || '...' }}
+          {{ myStore?.store_name || '...' }}
         </div>
         <BaseBadge v-if="myStore" :variant="myStore.status" :text="statusLabel(myStore.status)" />
       </div>
@@ -272,7 +399,17 @@ function formatPrice(n: number) {
 
       <!-- MY STORE TAB -->
       <div v-if="activeTab === 'store'">
-        <div style="font-size:11px;letter-spacing:3px;color:#555;margin-bottom:28px;">MY STORE</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:28px;flex-wrap:wrap;">
+          <div style="font-size:11px;letter-spacing:3px;color:#555;">MY STORE</div>
+          <button
+            @click="openStorePreview"
+            :disabled="!myStore?.id"
+            style="padding:10px 16px;background:none;border:1px solid #333;color:#ddd;font-family:inherit;font-size:9px;letter-spacing:2px;cursor:pointer;transition:all .2s;"
+            :style="!myStore?.id ? 'opacity:.5;cursor:not-allowed;' : ''"
+          >
+            VIEW STORE PAGE
+          </button>
+        </div>
 
         <div v-if="loadingStore" style="color:#555;font-size:12px;letter-spacing:2px;">LOADING...</div>
 
@@ -298,22 +435,30 @@ function formatPrice(n: number) {
           </div>
 
           <div style="margin-bottom:20px;">
-            <label style="display:block;font-size:10px;letter-spacing:2px;color:#555;margin-bottom:8px;">LOGO URL</label>
-            <input
-              v-model="storeFormLogo"
-              type="text"
-              style="width:100%;background:#111;border:1px solid #333;color:#fff;padding:12px 14px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;"
-              placeholder="https://..."
-            />
+            <label style="display:block;font-size:10px;letter-spacing:2px;color:#555;margin-bottom:8px;">LOGO</label>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <div style="width:50px;height:50px;background:#1a1a1a;border:1px solid #333;overflow:hidden;flex-shrink:0;">
+                <ImageFallback :src="storeFormLogoPreview || storeFormLogo" :fallback-text="storeFormName.slice(0,2)" />
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                @change="handleLogoFile"
+                style="font-size:11px;color:#555;"
+              />
+            </div>
           </div>
 
           <div style="margin-bottom:28px;">
-            <label style="display:block;font-size:10px;letter-spacing:2px;color:#555;margin-bottom:8px;">COVER IMAGE URL</label>
+            <label style="display:block;font-size:10px;letter-spacing:2px;color:#555;margin-bottom:8px;">COVER IMAGE</label>
+            <div style="margin-bottom:10px;background:#1a1a1a;border:1px solid #333;height:100px;overflow:hidden;display:flex;align-items:center;justify-content:center;">
+               <ImageFallback :src="storeFormCoverPreview || storeFormCover" :fallback-text="storeFormName" />
+            </div>
             <input
-              v-model="storeFormCover"
-              type="text"
-              style="width:100%;background:#111;border:1px solid #333;color:#fff;padding:12px 14px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;"
-              placeholder="https://..."
+              type="file"
+              accept="image/*"
+              @change="handleCoverFile"
+              style="font-size:11px;color:#555;"
             />
           </div>
 
@@ -431,12 +576,15 @@ function formatPrice(n: number) {
                 <div style="font-size:13px;font-weight:700;letter-spacing:1px;color:#fff;margin-bottom:4px;">
                   #{{ order.reference }}
                 </div>
-                <div style="font-size:10px;color:#555;letter-spacing:1px;margin-bottom:8px;">
-                  {{ order.city }} · {{ order.phone }}
+                <div style="font-size:10px;color:#555;letter-spacing:1px;margin-bottom:4px;">
+                  {{ order.city }} ({{ order.zip_code }}) · {{ order.phone }}
+                </div>
+                <div style="font-size:10px;color:#777;margin-bottom:8px;text-transform:uppercase;">
+                  {{ order.address }}
                 </div>
                 <div style="display:flex;align-items:center;gap:12px;">
                   <BaseBadge :variant="order.status" :text="statusLabel(order.status)" />
-                  <span style="font-size:12px;color:#aaa;">{{ formatPrice(order.total) }}</span>
+                  <span style="font-size:12px;color:#aaa;">{{ formatPrice(orderTotal(order)) }}</span>
                 </div>
               </div>
 
@@ -469,7 +617,7 @@ function formatPrice(n: number) {
                 <span style="color:#777;">{{ item.quantity }}×</span>
                 <span>{{ item.product?.name || '—' }}</span>
                 <span style="color:#555;">{{ item.size }}</span>
-                <span style="margin-left:auto;color:#ddd;">{{ formatPrice(item.unit_price * item.quantity) }}</span>
+                <span style="margin-left:auto;color:#ddd;">{{ formatPrice((item.unit_price ?? item.price ?? 0) * (item.quantity ?? 0)) }}</span>
               </div>
             </div>
           </div>
@@ -525,7 +673,7 @@ function formatPrice(n: number) {
           <!-- Price & Stock -->
           <div style="display:flex;gap:12px;">
             <div style="flex:1;">
-              <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">PRICE (DA) *</label>
+              <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">PRICE (MAD) *</label>
               <input
                 v-model.number="pdPrice"
                 type="number"
@@ -572,24 +720,49 @@ function formatPrice(n: number) {
 
           <!-- Sizes -->
           <div>
-            <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">SIZES (comma separated)</label>
-            <input
-              v-model="pdSizes"
-              type="text"
-              style="width:100%;background:#111;border:1px solid #333;color:#fff;padding:11px 13px;font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;"
-              placeholder="S,M,L,XL"
-            />
+            <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">SIZES</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <button
+                v-for="size in SIZES"
+                :key="size"
+                type="button"
+                @click="toggleSize(size)"
+                style="padding:10px 14px;background:none;border:1px solid #333;color:#777;font-family:inherit;font-size:10px;letter-spacing:2px;cursor:pointer;transition:all .2s;"
+                :style="pdSizes.includes(size) ? 'background:#fff;color:#000;border-color:#fff;' : ''"
+              >
+                {{ size }}
+              </button>
+            </div>
           </div>
 
-          <!-- Image URLs -->
+          <!-- Images -->
           <div>
-            <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">IMAGE URLS (one per line)</label>
+            <label style="display:block;font-size:9px;letter-spacing:2px;color:#555;margin-bottom:7px;">PRODUCT IMAGES</label>
+            <div style="margin-bottom:10px;">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                @change="handleProductImages"
+                style="font-size:11px;color:#555;"
+              />
+            </div>
+            <div style="font-size:9px;color:#444;margin-bottom:8px;">OR ADD URLS (ONE PER LINE)</div>
             <textarea
               v-model="pdImages"
-              rows="4"
+              rows="3"
               style="width:100%;background:#111;border:1px solid #333;color:#fff;padding:11px 13px;font-family:inherit;font-size:13px;outline:none;resize:vertical;box-sizing:border-box;"
               placeholder="https://..."
             ></textarea>
+            <div v-if="productImagePreviewUrls.length" style="margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+              <div
+                v-for="(img, index) in productImagePreviewUrls"
+                :key="img + '-' + index"
+                style="aspect-ratio:1;border:1px solid #333;background:#111;overflow:hidden"
+              >
+                <ImageFallback :src="img" :fallback-text="pdName.slice(0, 2) || 'IMG'" :alt="pdName || 'product image'" />
+              </div>
+            </div>
           </div>
 
           <!-- Actions -->
