@@ -31,14 +31,16 @@ class CartController extends Controller
 
         $item = CartItem::where('cart_id', $cart->id)
             ->where('product_id', $product->id)
+            ->where('size', $validated['size'])
             ->first();
 
         if ($item) {
-            $item->increment('quantity', $validated['quantity']);
+            $item->update(['quantity' => $validated['quantity']]);
         } else {
             $cart->items()->create([
                 'product_id' => $product->id,
                 'quantity' => $validated['quantity'],
+                'size' => $validated['size'],
             ]);
         }
 
@@ -53,12 +55,18 @@ class CartController extends Controller
     public function updateItem(UpdateCartItemRequest $request, int $productId)
     {
         $validated = $request->validated();
+        $size = $request->input('size'); // Optional if we want to target specific size or just single entry
 
         $cart = $this->getOrCreateCart($request);
 
-        $item = CartItem::where('cart_id', $cart->id)
-            ->where('product_id', $productId)
-            ->first();
+        $query = CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $productId);
+            
+        if ($size) {
+            $query->where('size', $size);
+        }
+
+        $item = $query->first();
 
         if (! $item) {
             return response()->json(['message' => 'Cart item not found'], 404);
@@ -75,11 +83,17 @@ class CartController extends Controller
 
     public function removeItem(Request $request, int $productId)
     {
+        $size = $request->input('size'); 
         $cart = $this->getOrCreateCart($request);
 
-        CartItem::where('cart_id', $cart->id)
-            ->where('product_id', $productId)
-            ->delete();
+        $query = CartItem::where('cart_id', $cart->id)
+            ->where('product_id', $productId);
+            
+        if ($size) {
+            $query->where('size', $size);
+        }
+
+        $query->delete();
 
         $cart->load('items.product');
 
