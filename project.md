@@ -21,8 +21,7 @@ Le projet adopte une architecture découplée avec une API REST et un frontend S
 - **Langage** : TypeScript
 
 ### Infrastructure & Stockage
-- **Base de données** : PostgreSQL 16
-- **Cache / File d'attente** : Redis 7
+- **Base de données** : PostgreSQL 16 (Stockage, Sessions & Cache)
 - **Serveur Web** : Nginx
 - **Conteneurisation** : Docker & Docker Compose
 
@@ -104,4 +103,3 @@ Le projet est standardisé via Docker pour assurer une stabilité maximale.
   - Frontend : `5173`
   - API Gateway (Nginx) : `8000`
   - DB : `5432`
-  - Cache : `6379`

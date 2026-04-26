@@ -19,8 +19,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
 
   # ── Nginx ─────────────────────────────────────────────────────────
   nginx:
@@ -59,24 +57,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── Redis ─────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: ejoutiya_redis
-    restart: unless-stopped
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
-    volumes:
-      - redisdata:/data
-    networks:
-      - ejoutiya_network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # ── Vue 3 Dev Server ──────────────────────────────────────────────
   frontend:
     image: node:20-alpine
@@ -98,4 +78,3 @@ networks:
 
 volumes:
   pgdata:
-  redisdata:
