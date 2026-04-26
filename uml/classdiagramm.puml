@@ -7,30 +7,30 @@ hide circle
 ' ENUMS
 ' =======================
 enum Category {
-  T_SHIRT
-  HOODIE
-  PANTS
-  SNEAKERS
-  ACCESSORIES
+  t_shirt
+  hoodie
+  pants
+  sneakers
+  accessories
 }
 
 enum OrderStatus {
-  PENDING
-  CONFIRMED
-  DELIVERY
-  REJECTED
+  pending
+  confirmed
+  delivery
+  rejected
 }
 
 enum ProductStatus {
-  ACTIVE
-  OUT_OF_STOCK
-  HIDDEN
+  active
+  out_of_stock
+  hidden
 }
 
 enum StoreStatus {
-  ACTIVE
-  SUSPENDED
-  PENDING_APPROVAL
+  active
+  suspended
+  pending_approval
 }
 
 ' =======================
@@ -41,13 +41,14 @@ class User {
   -name: string
   -email: string
   -password: string
+  -role: string
   
   -phone: string
   -city: string
-  -zipCode: string
+  -zip_code: string
   -address: string
   
-  -isBanned: boolean
+  -is_banned: boolean
 }
 
 class Client
@@ -68,15 +69,15 @@ Admin --> User : ban / unban
 ' =======================
 class Store {
   -id: int
-  -storeName: string
-  -bio: string
+  -user_id: int
+  -store_name: string
+  -bio: text
   -logo: string
-  -heroImage: string
+  -hero_image: string
   -status: StoreStatus
 }
 
-StoreOwner "1" --> "1" Store : owns
-Store --> StoreOwner : belongsTo
+StoreOwner "1" -- "0..1" Store : owns
 Admin --> Store : approve / suspend
 
 ' =======================
@@ -84,39 +85,52 @@ Admin --> Store : approve / suspend
 ' =======================
 class Product {
   -id: int
+  -store_id: int
   -name: string
   -description: string
-  -price: float
+  -price: decimal
   -stock: int
+  -sizes: json
   -category: Category
   -status: ProductStatus
 }
 
-class ProductImg {
+class ProductImage {
   -id: int
-  -imagePath: string
+  -product_id: int
+  -image_path: string
+  -sort_order: int
 }
 
 Store "1" --> "0..*" Product
-Product "1" --> "0..*" ProductImg : images
+Product "1" --> "0..*" ProductImage : images
 
 ' =======================
 ' ORDER
 ' =======================
 class Order {
   -id: int
+  -client_id: int
   -status: OrderStatus
-  -totalPrice: float
-  -createdAt: datetime
+  -total_price: decimal
+  -phone: string
+  -city: string
+  -zip_code: string
+  -address: text
+  -created_at: datetime
 }
 
 class OrderItem {
+  -id: int
+  -order_id: int
+  -product_id: int
   -quantity: int
-  -price: float
+  -price: decimal
+  -size: string
 }
 
 Client "1" --> "0..*" Order
-Order "1" --> "1..*" OrderItem
+Order "1" --> "0..*" OrderItem
 OrderItem "*" --> "1" Product
 
 ' =======================
@@ -124,14 +138,19 @@ OrderItem "*" --> "1" Product
 ' =======================
 class Cart {
   -id: int
-  -createdAt: datetime
+  -client_id: int
+  -created_at: datetime
 }
 
 class CartItem {
+  -id: int
+  -cart_id: int
+  -product_id: int
   -quantity: int
+  -size: string
 }
 
-Client "1" --> "1" Cart
+Client "1" --> "0..1" Cart
 Cart "1" --> "0..*" CartItem
 CartItem "*" --> "1" Product
 

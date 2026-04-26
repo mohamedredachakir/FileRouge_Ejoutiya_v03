@@ -16,8 +16,13 @@ class ProductController extends Controller
             ->where('status', 'active')
             ->whereHas('store', function ($storeQuery) {
                 $storeQuery->where('status', 'active');
-            })
-            ->latest();
+            });
+
+        if ($request->query('sort') === 'new') {
+            $query->latest();
+        } else {
+            $query->latest(); // Default sorting
+        }
 
         if ($request->filled('store_id')) {
             $query->where('store_id', $request->integer('store_id'));

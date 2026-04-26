@@ -47,7 +47,7 @@ export const useCartStore = defineStore('cart', () => {
     }
 
     const auth = useAuthStore()
-    if (auth.isAuthenticated) {
+    if (auth.isAuthenticated && auth.isClient) {
       const { cartService } = await import('../services/cart')
       await cartService.addItem({ 
         product_id: item.product_id, 
@@ -65,13 +65,13 @@ export const useCartStore = defineStore('cart', () => {
     if (items.value[idx].qty <= 0) {
       items.value.splice(idx, 1)
       const auth = useAuthStore()
-      if (auth.isAuthenticated) {
+      if (auth.isAuthenticated && auth.isClient) {
         const { cartService } = await import('../services/cart')
         await cartService.removeItemByProduct(productId, size)
       }
     } else {
       const auth = useAuthStore()
-      if (auth.isAuthenticated) {
+      if (auth.isAuthenticated && auth.isClient) {
         const { cartService } = await import('../services/cart')
         await cartService.addItem({ 
           product_id: productId, 
@@ -87,7 +87,7 @@ export const useCartStore = defineStore('cart', () => {
     if (idx !== -1) {
       items.value.splice(idx, 1)
       const auth = useAuthStore()
-      if (auth.isAuthenticated) {
+      if (auth.isAuthenticated && auth.isClient) {
         const { cartService } = await import('../services/cart')
         await cartService.removeItemByProduct(productId, size)
       }
@@ -97,7 +97,7 @@ export const useCartStore = defineStore('cart', () => {
   async function clearCart() { 
     items.value = [] 
     const auth = useAuthStore()
-    if (auth.isAuthenticated) {
+    if (auth.isAuthenticated && auth.isClient) {
       const { cartService } = await import('../services/cart')
       await cartService.clearCart()
     }
@@ -105,7 +105,7 @@ export const useCartStore = defineStore('cart', () => {
 
   async function syncWithBackend() {
     const auth = useAuthStore()
-    if (!auth.isAuthenticated) return
+    if (!auth.isAuthenticated || !auth.isClient) return
 
     try {
       const { cartService } = await import('../services/cart')
@@ -147,7 +147,7 @@ export const useCartStore = defineStore('cart', () => {
   // Sync on auth change
   const auth = useAuthStore()
   watch(() => auth.isAuthenticated, (isAuth) => {
-    if (isAuth) syncWithBackend()
+    if (isAuth && auth.isClient) syncWithBackend()
     else items.value = [] // Optional: clear on logout or keep local? Standard is clear or move to guest
   })
 

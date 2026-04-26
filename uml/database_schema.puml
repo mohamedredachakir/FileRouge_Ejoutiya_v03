@@ -1,0 +1,190 @@
+@startuml EjoutiyaEcom_DatabaseSchema
+
+skinparam classAttributeIconSize 0
+hide circle
+
+' =======================
+' ENUMS
+' =======================
+enum UserRole {
+  client
+  store_owner
+  admin
+}
+
+enum StoreStatus {
+  active
+  suspended
+  pending_approval
+}
+
+enum ProductCategory {
+  t_shirt
+  hoodie
+  pants
+  sneakers
+  accessories
+}
+
+enum ProductStatus {
+  active
+  out_of_stock
+  hidden
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  delivery
+  rejected
+}
+
+' =======================
+' AUTH / SYSTEM TABLES
+' =======================
+class users {
+  +id: bigint
+  name: string
+  email: string
+  email_verified_at: timestamp
+  password: string
+  role: UserRole
+  phone: string
+  city: string
+  zip_code: string
+  address: text
+  is_banned: boolean
+  remember_token: string
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+class password_reset_tokens {
+  +email: string
+  token: string
+  created_at: timestamp
+}
+
+class sessions {
+  +id: string
+  user_id: bigint
+  ip_address: string
+  user_agent: text
+  payload: longtext
+  last_activity: int
+}
+
+class personal_access_tokens {
+  +id: bigint
+  tokenable_type: string
+  tokenable_id: bigint
+  name: text
+  token: string
+  abilities: text
+  last_used_at: timestamp
+  expires_at: timestamp
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+' =======================
+' STORE / PRODUCT TABLES
+' =======================
+class stores {
+  +id: bigint
+  user_id: bigint
+  store_name: string
+  bio: text
+  logo: string
+  hero_image: string
+  status: StoreStatus
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+class products {
+  +id: bigint
+  store_id: bigint
+  name: string
+  description: text
+  price: decimal(10,2)
+  stock: int
+  sizes: json
+  category: ProductCategory
+  status: ProductStatus
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+class product_images {
+  +id: bigint
+  product_id: bigint
+  image_path: string
+  sort_order: int
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+' =======================
+' CART TABLES
+' =======================
+class carts {
+  +id: bigint
+  client_id: bigint
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+class cart_items {
+  +id: bigint
+  cart_id: bigint
+  product_id: bigint
+  size: string
+  quantity: int
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+' =======================
+' ORDER TABLES
+' =======================
+class orders {
+  +id: bigint
+  client_id: bigint
+  status: OrderStatus
+  total_price: decimal(10,2)
+  phone: string
+  city: string
+  zip_code: string
+  address: text
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+class order_items {
+  +id: bigint
+  order_id: bigint
+  product_id: bigint
+  size: string
+  quantity: int
+  price: decimal(10,2)
+  created_at: timestamp
+  updated_at: timestamp
+}
+
+' =======================
+' RELATIONSHIPS
+' =======================
+users ||--o| stores : user_id
+users ||--o| carts : client_id
+users ||--o{ orders : client_id
+users ||--o{ sessions : user_id
+
+stores ||--o{ products : store_id
+products ||--o{ product_images : product_id
+carts ||--o{ cart_items : cart_id
+products ||--o{ cart_items : product_id
+orders ||--o{ order_items : order_id
+products ||--o{ order_items : product_id
+
+@enduml
